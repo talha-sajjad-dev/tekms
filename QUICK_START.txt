@@ -1,0 +1,80 @@
+BIGCOMMERCE QUOTE APP - READY TO USE
+=====================================
+
+YOUR CREDENTIALS (Already configured in .env.local):
+- Client ID: pfhxrri7i3kq82scfcclyl3mkqh5soj
+- Client Secret: 43900c5e63a46af0f0e3a4855c35ff68409266f6ef68b83d11f3d02102198cc1
+
+WHAT'S RUNNING:
+- Development server: http://localhost:3000
+- OAuth callback: http://localhost:3000/api/auth/callback
+- Load endpoint: http://localhost:3000/api/load
+- Admin dashboard: http://localhost:3000/bc-admin
+
+NEXT STEPS:
+
+1. UPDATE BIGCOMMERCE DEVTOOLS (https://devtools.bigcommerce.com)
+   - Edit your app
+   - Set callback URLs to:
+     Auth: http://localhost:3000/api/auth/callback
+     Load: http://localhost:3000/api/load
+     Uninstall: http://localhost:3000/api/uninstall
+
+2. INSTALL APP ON YOUR STORE
+   - Visit: https://login.bigcommerce.com/app/pfhxrri7i3kq82scfcclyl3mkqh5soj/install
+   - Select your store
+   - Click Authorize
+
+3. TEST THE APP
+   - After install, you'll see the admin dashboard
+   - Check if quotes list loads (will be empty initially)
+
+4. ADD WIDGET TO STOREFRONT
+   - Edit your theme's product page
+   - Add this code before </body>:
+
+   <link rel="stylesheet" href="http://localhost:3000/widgets/quote-widget.css">
+   <script>
+     window.QUOTE_WIDGET_API_URL = 'http://localhost:3000';
+     window.QUOTE_WIDGET_STORE_HASH = 't48lqqxd8a';
+   </script>
+   <script src="http://localhost:3000/widgets/quote-widget.js"></script>
+
+   - Replace "Add to Cart" button with:
+   
+   <button 
+     data-quote-button
+     data-product-id="{{product.id}}"
+     data-product-name="{{product.title}}"
+     data-product-sku="{{product.sku}}"
+     data-product-price="{{product.price.without_tax.value}}"
+   >
+     Get a Quote
+   </button>
+
+TESTING:
+1. Go to a product page on your store
+2. Click "Get a Quote" button  
+3. Fill out the form
+4. Check admin dashboard for the quote
+
+FILES CREATED:
+- OAuth: app/api/auth/callback/route.ts, app/api/load/route.ts, app/api/uninstall/route.ts
+- Admin: app/bc-admin/page.tsx
+- APIs: app/api/bc/quotes/list/route.ts, app/api/bc/quotes/submit/route.ts, app/api/bc/quotes/[id]/route.ts
+- Widget: public/widgets/quote-widget.js, public/widgets/quote-widget.css
+- Storage: lib/bigcommerce-app/storage.ts, lib/bigcommerce-app/auth.ts
+- Types: types/bigcommerce-app.ts
+
+DATA STORAGE:
+- data/stores.json - Store access tokens (created automatically)
+- data/quotes.json - Quote requests (created automatically)
+
+DEPLOYMENT (when ready):
+1. Push to GitHub
+2. Deploy to Vercel
+3. Update BigCommerce DevTools with Vercel URL
+4. Update .env.local: BIGCOMMERCE_APP_URL=https://your-app.vercel.app
+5. Reinstall app
+
+Your app is ready! Development server should be running on http://localhost:3000

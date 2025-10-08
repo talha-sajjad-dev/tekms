@@ -1,0 +1,213 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { readTikTokTemplate, createTikTokExcel } from '@/lib/tiktok/excel-utils'
+import { batchProcessProducts } from '@/lib/tiktok/data-mapper'
+
+// BigCommerce API configuration
+const STORE_HASH = process.env.BIGCOMMERCE_STORE_HASH || "t48lqqxd8a"
+const ACCESS_TOKEN = process.env.BIGCOMMERCE_ACCESS_TOKEN || "mj7iz6x9io2hx9o43zifx4zv3s7ewrx"
+const API_URL = `https://api.bigcommerce.com/stores/${STORE_HASH}/v3`
+
+const headers = {
+  "Content-Type": "application/json",
+  "X-Auth-Token": ACCESS_TOKEN as string,
+  Accept: "application/json",
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { productIds, selectedGroups, includeVariants = true } = body
+    
+    console.log('=== TIKTOK EXPORT REQUEST ===')
+    console.log('Product IDs:', productIds?.length || 'Not specified')
+    console.log('Selected Groups:', selectedGroups?.length || 'Not specified')
+    console.log('Include variants:', includeVariants)
+    
+    // Read the template
+    const template = await readTikTokTemplate()
+    
+    // Fetch products
+    let products = []
+    
+    if (productIds && productIds.length > 0) {
+      // Fetch specific products by ID - EFFICIENT METHOD
+      console.log(`Fetching ${productIds.length} specific products by ID...`)
+      
+      for (const productId of productIds) {
+        try {
+          const response = await fetch(`${API_URL}/catalog/products/${productId}?include=images,modifiers`, {
+            headers,
+            cache: "no-store",
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            products.push(data.data)
+          }
+        } catch (error) {
+          console.error(`Error fetching product ${productId}:`, error)
+        }
+        
+        // Small delay to avoid rate limiting
+        if (productIds.length > 1) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+      
+      console.log(`Successfully fetched ${products.length} products`)
+    } else {
+      // Fetch all products (fallback)
+      console.log('Fetching all products...')
+      
+      let allProducts: any[] = []
+      let currentPage = 1
+      let hasMorePages = true
+      
+      while (hasMorePages) {
+        const response = await fetch(
+          `${API_URL}/catalog/products?limit=250&page=${currentPage}&include=images,modifiers`,
+          {
+            headers,
+            cache: "no-store",
+          }
+        )
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        const pageProducts = data.data || []
+        
+        allProducts = [...allProducts, ...pageProducts]
+        
+        // Check if there are more pages
+        const totalPages = data.meta?.pagination?.total_pages || 1
+        hasMorePages = currentPage < totalPages
+        currentPage++
+        
+        console.log(`Fetched page ${currentPage - 1}/${totalPages}, total products so far: ${allProducts.length}`)
+        
+        // Rate limiting
+        if (hasMorePages) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      
+      products = allProducts
+    }
+    
+    console.log(`Total products to export: ${products.length}`)
+    
+    // Fetch categories for mapping
+    const categoriesResponse = await fetch(`${API_URL}/catalog/categories?limit=250`, {
+      headers,
+      cache: "no-store",
+    })
+    
+    const categoriesData = await categoriesResponse.json()
+    const categories = categoriesData.data || []
+    
+    // Create category mapping
+    const categoryMapping: Record<number, string> = {}
+    categories.forEach((cat: any) => {
+      categoryMapping[cat.id] = cat.name
+    })
+    
+    // Process products to TikTok format
+    const tiktokProducts = batchProcessProducts(products, categoryMapping)
+    
+    console.log(`Processed ${tiktokProducts.length} TikTok products (including variants)`)
+    
+    // Create Excel file with TikTok products (preserving template data)
+    const excelBuffer = await createTikTokExcel(tiktokProducts, template)
+    
+    // Return the file
+    return new NextResponse(excelBuffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="tiktok-products-${new Date().toISOString().split('T')[0]}.xlsx"`,
+      },
+    })
+  } catch (error) {
+    console.error('Error exporting to TikTok:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to export products',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// GET endpoint to fetch products formatted for TikTok preview
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const page = parseInt(searchParams.get('page') || '1')
+    const search = searchParams.get('search') || ''
+    
+    console.log('=== FETCHING PRODUCTS FOR TIKTOK PREVIEW ===')
+    console.log('Search term:', search || 'None')
+    
+    // Build API URL with optional search
+    let apiUrl = `${API_URL}/catalog/products?limit=${limit}&page=${page}&include=images,modifiers`
+    
+    // Add search filter if provided
+    if (search) {
+      apiUrl += `&name:like=${encodeURIComponent(search)}`
+    }
+    
+    // Fetch products
+    const response = await fetch(apiUrl, {
+      headers,
+      cache: "no-store",
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch products: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const products = data.data || []
+    
+    // Fetch categories
+    const categoriesResponse = await fetch(`${API_URL}/catalog/categories?limit=250`, {
+      headers,
+      cache: "no-store",
+    })
+    
+    const categoriesData = await categoriesResponse.json()
+    const categories = categoriesData.data || []
+    
+    // Create category mapping
+    const categoryMapping: Record<number, string> = {}
+    categories.forEach((cat: any) => {
+      categoryMapping[cat.id] = cat.name
+    })
+    
+    // Process products to TikTok format
+    const tiktokProducts = batchProcessProducts(products, categoryMapping)
+    
+    return NextResponse.json({
+      success: true,
+      data: tiktokProducts,
+      pagination: data.meta?.pagination || {},
+      totalProducts: products.length,
+      totalTikTokProducts: tiktokProducts.length
+    })
+  } catch (error) {
+    console.error('Error fetching TikTok products:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch products',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}

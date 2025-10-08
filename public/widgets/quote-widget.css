@@ -1,0 +1,272 @@
+/**
+ * BigCommerce Get a Quote Widget Styles
+ */
+
+/* Modal Overlay */
+.quote-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quote-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Modal Content */
+.quote-modal-content {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+  z-index: 10001;
+}
+
+.quote-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.2s;
+}
+
+.quote-modal-close:hover {
+  color: #333;
+}
+
+.quote-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px 0;
+  color: #1a1a1a;
+}
+
+/* Product Info */
+.quote-product-info {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.quote-product-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.quote-product-info h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #1a1a1a;
+}
+
+.quote-product-sku {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 4px 0;
+}
+
+.quote-product-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2563eb;
+  margin: 0;
+}
+
+/* Form Styles */
+.quote-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quote-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quote-form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.quote-form-group input,
+.quote-form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.quote-form-group input:focus,
+.quote-form-group textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.quote-form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Form Actions */
+.quote-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.quote-btn-cancel,
+.quote-btn-submit {
+  flex: 1;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.quote-btn-cancel {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.quote-btn-cancel:hover {
+  background: #f9fafb;
+}
+
+.quote-btn-submit {
+  background: #2563eb;
+  color: white;
+}
+
+.quote-btn-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.quote-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Messages */
+.quote-form-message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.quote-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.quote-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* Get a Quote Button (for product pages) */
+.quote-button,
+button[data-quote-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quote-button:hover,
+button[data-quote-button]:hover {
+  background: #1d4ed8;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .quote-modal-content {
+    width: 95%;
+    padding: 24px 20px;
+    max-height: 95vh;
+  }
+  
+  .quote-modal-title {
+    font-size: 20px;
+  }
+  
+  .quote-product-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .quote-form-actions {
+    flex-direction: column;
+  }
+  
+  .quote-btn-cancel,
+  .quote-btn-submit {
+    width: 100%;
+  }
+}
+
+/* Animation */
+@keyframes quote-modal-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.quote-modal-content {
+  animation: quote-modal-fade-in 0.2s ease-out;
+}
