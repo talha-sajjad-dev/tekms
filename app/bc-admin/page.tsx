@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import type { QuoteRequest } from '@/types/bigcommerce-app'
 
-export default function BigCommerceAdmin() {
+function AdminContent() {
   const searchParams = useSearchParams()
   const context = searchParams.get('context')
   const storeHash = searchParams.get('store_hash')
@@ -290,5 +290,13 @@ export default function BigCommerceAdmin() {
 
       <Toaster />
     </div>
+  )
+}
+
+export default function BigCommerceAdmin() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-10"><div className="text-center">Loading...</div></div>}>
+      <AdminContent />
+    </Suspense>
   )
 }
