@@ -9,10 +9,11 @@ import { Toaster } from "@/components/ui/toaster"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { 
-  Download, 
-  FileSpreadsheet, 
-  RefreshCw, 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Download,
+  FileSpreadsheet,
+  RefreshCw,
   Search,
   Info,
   CheckCircle2,
@@ -62,6 +63,7 @@ export default function TikTokExportPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(50)
   const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function TikTokExportPage() {
 
   useEffect(() => {
     loadProducts()
-  }, [currentPage, searchTerm])
+  }, [currentPage, searchTerm, itemsPerPage])
 
   // Group products by base SKU whenever products change
   useEffect(() => {
@@ -145,19 +147,29 @@ export default function TikTokExportPage() {
     setLoading(true)
     try {
       // Build API URL with optional search parameter
-      let apiUrl = `/api/tiktok/export?limit=50&page=${currentPage}`
+      let apiUrl = `/api/tiktok/export?limit=${itemsPerPage}&page=${currentPage}`
       if (searchTerm) {
         apiUrl += `&search=${encodeURIComponent(searchTerm)}`
       }
       
+      console.log('Fetching products with URL:', apiUrl)
+      console.log('Items per page:', itemsPerPage)
+      
       const response = await fetch(apiUrl)
       const data = await response.json()
+      
+      console.log('API Response:', {
+        totalProducts: data.totalProducts,
+        totalTikTokProducts: data.totalTikTokProducts,
+        dataLength: data.data?.length
+      })
       
       if (data.success) {
         setProducts(data.data)
         setTotalPages(data.pagination.total_pages || 1)
         
         const groups = groupProductsByBase(data.data)
+        console.log('Created groups:', groups.length, 'from', data.data.length, 'TikTok products')
         
         if (!searchTerm) {
           toast({
@@ -472,24 +484,49 @@ export default function TikTokExportPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1 || loading}
-                >
-                  Previous
-                </Button>
-                <span className="flex items-center px-4">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages || loading}
-                >
-                  Next
-                </Button>
+              <div className="flex flex-col gap-4 mt-6">
+                <div className="flex justify-center items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Products per page:</span>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => {
+                        setItemsPerPage(Number(value))
+                        setCurrentPage(1) // Reset to first page when changing items per page
+                      }}
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="200">200</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1 || loading}
+                  >
+                    Previous
+                  </Button>
+                  <span className="flex items-center px-4">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || loading}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

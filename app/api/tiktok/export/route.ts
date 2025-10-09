@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     const excelBuffer = await createTikTokExcel(tiktokProducts, template)
     
     // Return the file
-    return new NextResponse(excelBuffer, {
+    return new NextResponse(Buffer.from(excelBuffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="tiktok-products-${new Date().toISOString().split('T')[0]}.xlsx"`,
@@ -146,22 +146,27 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const limit = parseInt(searchParams.get('limit') || '50')
     const page = parseInt(searchParams.get('page') || '1')
     const search = searchParams.get('search') || ''
     
     console.log('=== FETCHING PRODUCTS FOR TIKTOK PREVIEW ===')
+    console.log('Requested limit:', limit)
+    console.log('Requested page:', page)
     console.log('Search term:', search || 'None')
     
     // Build API URL with optional search
-    let apiUrl = `${API_URL}/catalog/products?limit=${limit}&page=${page}&include=images,modifiers`
+    // Note: include=modifiers limits results to 10 products max in BigCommerce API
+    // For preview, we only need images, not full modifier details
+    let apiUrl = `${API_URL}/catalog/products?limit=${limit}&page=${page}&include=images`
     
-    // Add search filter if provided
+    // Add search filter if provided - let BigCommerce API handle the search
     if (search) {
-      apiUrl += `&name:like=${encodeURIComponent(search)}`
+      apiUrl += `&keyword=${encodeURIComponent(search)}`
     }
     
     // Fetch products
+    console.log('Calling BigCommerce API:', apiUrl)
     const response = await fetch(apiUrl, {
       headers,
       cache: "no-store",
@@ -172,7 +177,12 @@ export async function GET(request: NextRequest) {
     }
     
     const data = await response.json()
-    const products = data.data || []
+    let products = data.data || []
+    
+    console.log('BigCommerce returned:', {
+      productsCount: products.length,
+      pagination: data.meta?.pagination
+    })
     
     // Fetch categories
     const categoriesResponse = await fetch(`${API_URL}/catalog/categories?limit=250`, {
@@ -189,8 +199,41 @@ export async function GET(request: NextRequest) {
       categoryMapping[cat.id] = cat.name
     })
     
-    // Process products to TikTok format
-    const tiktokProducts = batchProcessProducts(products, categoryMapping)
+    // For preview, we don't expand variants - just show base products
+    // This prevents the "too many combinations" issue and keeps the preview fast
+    const tiktokProducts: any[] = []
+    
+    products.forEach((product: any) => {
+      const categoryId = product.categories?.[0]
+      const categoryName = categoryId ? categoryMapping[categoryId] || 'General' : 'General'
+      
+      // Just create base product without variant expansion
+      const images = product.images || []
+      const sortedImages = images.sort((a: any, b: any) => {
+        if (!a.is_thumbnail && b.is_thumbnail) return -1
+        if (a.is_thumbnail && !b.is_thumbnail) return 1
+        return 0
+      })
+      
+      const baseProduct: any = {
+        'Product Title': product.name,
+        'Description': (product.description || '').replace(/<[^>]*>/g, '').trim().substring(0, 200),
+        'Price': product.sale_price || product.price,
+        'SKU': product.sku,
+        'Category': categoryName,
+        'Brand': product.brand_name || 'Unbranded',
+        'Status': product.is_visible ? 'active' : 'draft',
+        productId: product.id
+      }
+      
+      // Add first image if available
+      if (sortedImages.length > 0) {
+        const imageUrl = sortedImages[0].url_original || sortedImages[0].url_zoom || sortedImages[0].url_standard
+        baseProduct['Image 1'] = imageUrl?.split('?')[0]
+      }
+      
+      tiktokProducts.push(baseProduct)
+    })
     
     return NextResponse.json({
       success: true,
