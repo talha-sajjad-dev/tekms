@@ -11,6 +11,13 @@ export const authConfig: NextAuthConfig = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code"
+        }
+      }
     }),
     CredentialsProvider({
       name: 'credentials',
@@ -58,40 +65,97 @@ export const authConfig: NextAuthConfig = {
     })
   ],
   callbacks: {
-    async jwt({ token, user }: any) {
+    async jwt({ token, user, account, profile }: any) {
+      console.log('[AUTH] JWT callback triggered', {
+        hasUser: !!user,
+        hasAccount: !!account,
+        accountProvider: account?.provider,
+        userEmail: user?.email
+      })
+      
       // Add user info to token on sign in
       if (user) {
         token.id = user.id
         token.role = user.role
+        console.log('[AUTH] Added user to token:', { id: user.id, role: user.role })
       }
       return token
     },
     async session({ session, token }: any) {
+      console.log('[AUTH] Session callback triggered', {
+        hasSession: !!session,
+        hasToken: !!token,
+        tokenId: token?.id
+      })
+      
       // Add token info to session
       if (session.user && token) {
         session.user.id = token.id
         session.user.role = token.role
+        console.log('[AUTH] Session created for user:', token.id)
       }
       return session
     },
-    async signIn({ user }: any) {
-      // Create free subscription for new users (for OAuth providers)
-      if (user.id && user.email) {
-        const existingSubscription = await prisma.subscription.findUnique({
-          where: { userId: user.id },
-        })
-
-        if (!existingSubscription) {
-          await prisma.subscription.create({
-            data: {
-              userId: user.id,
-              tier: 'FREE',
-              status: 'ACTIVE',
-            },
+    async signIn({ user, account, profile }: any) {
+      console.log('[AUTH] SignIn callback triggered', {
+        provider: account?.provider,
+        userEmail: user?.email,
+        userId: user?.id,
+        hasProfile: !!profile
+      })
+      
+      try {
+        // For OAuth providers, ensure user exists in database
+        if (account?.provider === 'google') {
+          console.log('[AUTH] Google OAuth sign in for:', user.email)
+          
+          // Check if user exists
+          let dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
           })
+          
+          // Create user if doesn't exist
+          if (!dbUser) {
+            console.log('[AUTH] Creating new user:', user.email)
+            dbUser = await prisma.user.create({
+              data: {
+                email: user.email,
+                name: user.name || user.email,
+                role: 'USER',
+              },
+            })
+            console.log('[AUTH] User created with ID:', dbUser.id)
+          } else {
+            console.log('[AUTH] Existing user found:', dbUser.id)
+          }
+          
+          // Update user object with database ID
+          user.id = dbUser.id
+          user.role = dbUser.role
+          
+          // Create free subscription if needed
+          const existingSubscription = await prisma.subscription.findUnique({
+            where: { userId: dbUser.id },
+          })
+
+          if (!existingSubscription) {
+            console.log('[AUTH] Creating free subscription for:', dbUser.id)
+            await prisma.subscription.create({
+              data: {
+                userId: dbUser.id,
+                tier: 'FREE',
+                status: 'ACTIVE',
+              },
+            })
+          }
         }
+        
+        console.log('[AUTH] Sign in successful for:', user.email)
+        return true
+      } catch (error) {
+        console.error('[AUTH] Sign in error:', error)
+        return false
       }
-      return true
     },
   },
   pages: {
@@ -113,13 +177,30 @@ export const authConfig: NextAuthConfig = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug in all environments
+  logger: {
+    error(error: Error) {
+      console.error('[AUTH ERROR]', error)
+    },
+    warn(code: string) {
+      console.warn('[AUTH WARN]', code)
+    },
+    debug(code: string, metadata?: any) {
+      console.log('[AUTH DEBUG]', code, metadata)
+    }
+  },
   events: {
     async createUser({ user }: any) {
-      console.log('New user created:', user.email)
+      console.log('[AUTH EVENT] New user created:', user.email)
     },
     async signIn({ user }: any) {
-      console.log('User signed in:', user.email)
+      console.log('[AUTH EVENT] User signed in:', user.email)
     },
+    async signOut({ token }: any) {
+      console.log('[AUTH EVENT] User signed out:', token?.email)
+    },
+    async session({ session }: any) {
+      console.log('[AUTH EVENT] Session checked:', session?.user?.email)
+    }
   },
 }
