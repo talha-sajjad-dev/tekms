@@ -26,44 +26,15 @@ apt install -y nginx
 echo "📦 Installing Certbot..."
 apt install -y certbot python3-certbot-nginx
 
-# Copy Nginx configuration
-echo "📝 Setting up Nginx configuration..."
+# Copy Nginx configuration (HTTP only first, certbot will add HTTPS)
+echo "📝 Setting up initial Nginx configuration (HTTP only)..."
 cat > /etc/nginx/sites-available/tekms << 'EOF'
-# Redirect HTTP to HTTPS
+# HTTP Server - Certbot will modify this
 server {
     listen 80;
     listen [::]:80;
     server_name tekms.com www.tekms.com;
     
-    # Let's Encrypt verification
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-    
-    # Redirect all other traffic to HTTPS
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
-}
-
-# HTTPS Server (SSL will be configured by certbot)
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name tekms.com www.tekms.com;
-
-    # Certbot will add SSL certificates here
-
-    # Security Headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # Logging
-    access_log /var/log/nginx/tekms.access.log;
-    error_log /var/log/nginx/tekms.error.log;
-
     # Proxy to Next.js (port 3000)
     location / {
         proxy_pass http://localhost:3000;
@@ -83,12 +54,6 @@ server {
 
     # Increase max body size
     client_max_body_size 10M;
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/javascript application/json application/javascript;
 }
 EOF
 
