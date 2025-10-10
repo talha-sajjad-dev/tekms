@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs'
 
 export const authConfig: NextAuthConfig = {
   trustHost: true,
-  useSecureCookies: process.env.NODE_ENV === 'production',
+  useSecureCookies: false, // Disable for proxy compatibility
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
