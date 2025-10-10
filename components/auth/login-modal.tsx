@@ -24,10 +24,11 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = () => {
     setIsLoading(true)
-    // Use NextAuth's signIn which respects NEXTAUTH_URL
-    await signIn('google', { callbackUrl: '/dashboard' })
+    // Redirect to NextAuth's Google sign-in endpoint
+    // NextAuth will handle the redirect using NEXTAUTH_URL
+    window.location.href = '/api/auth/signin/google'
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
