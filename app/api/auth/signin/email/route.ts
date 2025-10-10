@@ -16,10 +16,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
+    // Use raw query to bypass TypeScript types
+    const users = await prisma.$queryRaw<Array<{
+      id: string
+      email: string
+      name: string | null
+      password: string | null
+    }>>`
+      SELECT id, email, name, password
+      FROM "User"
+      WHERE email = ${email}
+    `
+
+    const user = users[0]
 
     if (!user) {
       console.log('❌ User not found:', email)
@@ -29,9 +38,7 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    const storedPassword = (user as any).password
-    
-    if (!storedPassword) {
+    if (!user.password) {
       console.log('❌ No password stored for user')
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -40,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify password
-    const isValid = await bcrypt.compare(password, storedPassword)
+    const isValid = await bcrypt.compare(password, user.password)
     console.log('🔑 Password valid:', isValid)
 
     if (!isValid) {
