@@ -95,7 +95,8 @@ export async function GET(req: NextRequest) {
     })
 
     // Set cookie and redirect
-    const response = NextResponse.redirect(new URL(state, req.url))
+    const baseUrl = process.env.NEXTAUTH_URL || req.url
+    const response = NextResponse.redirect(new URL(state, baseUrl))
     response.cookies.set('next-auth.session-token', session.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -107,6 +108,7 @@ export async function GET(req: NextRequest) {
     return response
   } catch (error) {
     console.error('Google OAuth error:', error)
-    return NextResponse.redirect(new URL('/?error=auth_failed', req.url))
+    const baseUrl = process.env.NEXTAUTH_URL || req.url
+    return NextResponse.redirect(new URL('/?error=auth_failed', baseUrl))
   }
 }
