@@ -9,8 +9,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from '@/components/ui/use-toast'
 import { Toaster } from '@/components/ui/toaster'
-import { Plus, Trash2, ShoppingCart, Video, Package, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, ShoppingCart, Video, Package, Eye, EyeOff, ExternalLink, HelpCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface Credential {
   id: string
@@ -30,6 +32,23 @@ const platformConfig = {
       { name: 'clientId', label: 'Client ID', type: 'text', placeholder: 'your-client-id' },
       { name: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: 'your-client-secret' },
     ],
+    guide: {
+      title: 'Where to find BigCommerce credentials',
+      steps: [
+        'Log in to your BigCommerce store',
+        'Go to Advanced Settings → API Accounts',
+        'Click "Create API Account"',
+        'Select "Create V2/V3 API Token"',
+        'Set OAuth Scopes (read/write permissions)',
+        'Click "Save" to generate your credentials'
+      ],
+      notes: [
+        'Store Hash: Found in your store URL (store-xxxxx.mybigcommerce.com)',
+        'Access Token: Generated when you create the API account',
+        'Client ID & Secret: Provided after creating the API account'
+      ],
+      link: 'https://support.bigcommerce.com/s/article/Store-API-Accounts'
+    }
   },
   TIKTOK: {
     name: 'TikTok Shop',
@@ -40,6 +59,23 @@ const platformConfig = {
       { name: 'appSecret', label: 'App Secret', type: 'password', placeholder: 'your-app-secret' },
       { name: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'your-access-token' },
     ],
+    guide: {
+      title: 'Where to find TikTok Shop credentials',
+      steps: [
+        'Go to TikTok Shop Seller Center',
+        'Navigate to Settings → Open Platform',
+        'Click "Create App" or select existing app',
+        'Copy the App Key and App Secret',
+        'Click "Generate Access Token"',
+        'Authorize the required permissions'
+      ],
+      notes: [
+        'App Key: Found in your app details',
+        'App Secret: Displayed when creating the app (save it securely)',
+        'Access Token: Generate from the authorization flow'
+      ],
+      link: 'https://seller-us.tiktok.com/university/essay?knowledge_id=6867891914828058374'
+    }
   },
   ETSY: {
     name: 'Etsy',
@@ -49,6 +85,22 @@ const platformConfig = {
       { name: 'apiKey', label: 'API Key', type: 'text', placeholder: 'your-api-key' },
       { name: 'shopId', label: 'Shop ID', type: 'text', placeholder: 'your-shop-id' },
     ],
+    guide: {
+      title: 'Where to find Etsy credentials',
+      steps: [
+        'Go to Etsy Developers portal',
+        'Sign in with your Etsy account',
+        'Click "Apps" → "New App"',
+        'Fill in app details and submit',
+        'Once approved, get your API Key (Keystring)',
+        'Find your Shop ID in your shop\'s URL or API response'
+      ],
+      notes: [
+        'API Key: Found in your app details page',
+        'Shop ID: Numeric ID from your shop URL or use the findAllShops API'
+      ],
+      link: 'https://www.etsy.com/developers/documentation/getting_started/register'
+    }
   },
 }
 
@@ -247,38 +299,85 @@ export default function CredentialsPage() {
                 />
               </div>
 
-              {selectedPlatform && platformConfig[selectedPlatform].fields.map((field) => (
-                <div key={field.name} className="space-y-2">
-                  <Label htmlFor={field.name}>{field.label} *</Label>
-                  <div className="relative">
-                    <Input
-                      id={field.name}
-                      type={field.type === 'password' && !showPasswords[field.name] ? 'password' : 'text'}
-                      placeholder={field.placeholder}
-                      value={formData[field.name] || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value
-                      }))}
-                    />
-                    {field.type === 'password' && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => togglePasswordVisibility(field.name)}
-                      >
-                        {showPasswords[field.name] ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
+              {selectedPlatform && (
+                <>
+                  <Alert>
+                    <HelpCircle className="h-4 w-4" />
+                    <AlertTitle>Need help finding your credentials?</AlertTitle>
+                    <AlertDescription>
+                      <Accordion type="single" collapsible className="w-full mt-2">
+                        <AccordionItem value="guide" className="border-0">
+                          <AccordionTrigger className="text-sm py-2">
+                            View setup guide
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <p className="font-semibold mb-2">{platformConfig[selectedPlatform].guide.title}</p>
+                                <ol className="list-decimal list-inside space-y-1">
+                                  {platformConfig[selectedPlatform].guide.steps.map((step, i) => (
+                                    <li key={i} className="text-muted-foreground">{step}</li>
+                                  ))}
+                                </ol>
+                              </div>
+                              <div className="bg-muted p-3 rounded-md">
+                                <p className="font-semibold mb-1">Important Notes:</p>
+                                <ul className="space-y-1">
+                                  {platformConfig[selectedPlatform].guide.notes.map((note, i) => (
+                                    <li key={i} className="text-muted-foreground text-xs">• {note}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <a
+                                href={platformConfig[selectedPlatform].guide.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-primary hover:underline text-sm"
+                              >
+                                Official Documentation
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                              </a>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </AlertDescription>
+                  </Alert>
+
+                  {platformConfig[selectedPlatform].fields.map((field) => (
+                    <div key={field.name} className="space-y-2">
+                      <Label htmlFor={field.name}>{field.label} *</Label>
+                      <div className="relative">
+                        <Input
+                          id={field.name}
+                          type={field.type === 'password' && !showPasswords[field.name] ? 'password' : 'text'}
+                          placeholder={field.placeholder}
+                          value={formData[field.name] || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            [field.name]: e.target.value
+                          }))}
+                        />
+                        {field.type === 'password' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => togglePasswordVisibility(field.name)}
+                          >
+                            {showPasswords[field.name] ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
                         )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
 
               <Button
                 className="w-full"

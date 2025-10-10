@@ -55,26 +55,8 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // Create session
-    const session = await prisma.session.create({
-      data: {
-        userId: user.id,
-        sessionToken: crypto.randomUUID(),
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-      }
-    })
-
-    // Set session cookie
-    const response = NextResponse.json({ success: true })
-    response.cookies.set('next-auth.session-token', session.sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: session.expires,
-      path: '/'
-    })
-
-    return response
+    // Return success - client will handle sign in
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Signup error:', error)
     return NextResponse.json(

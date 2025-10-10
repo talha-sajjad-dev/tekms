@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { EtsyHttpScraper } from '@/lib/etsy/http-scraper'
 import { SEOOptimizer } from '@/lib/seo/optimizer'
 import { ProductCreator } from '@/lib/bigcommerce/product-creator'
+import { enforceUsageLimit, trackUsage } from '@/lib/usage/tracker'
 
 export interface ImportRequest {
   etsyUrl: string
@@ -48,6 +50,26 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
+    // Check authentication
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Unauthorized'
+      }, { status: 401 })
+    }
+
+    // Check usage limit before processing (1 product = 1 import)
+    try {
+      await enforceUsageLimit(session.user.id, 1)
+    } catch (error) {
+      return NextResponse.json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Usage limit exceeded',
+        limitExceeded: true
+      }, { status: 403 })
+    }
+
     console.log('🚀 Starting Etsy import process...')
     
     const body: ImportRequest = await request.json()
@@ -155,6 +177,20 @@ export async function POST(request: NextRequest) {
     }
 
     const processingTime = Date.now() - startTime
+
+    // Track usage (1 product imported from Etsy)
+    await trackUsage({
+      userId: session.user.id,
+      action: 'ETSY_IMPORT',
+      productCount: 1,
+      platform: 'ETSY',
+      metadata: {
+        productId: creationResult.productId,
+        etsyUrl,
+        sku: creationResult.sku,
+        processingTime
+      }
+    })
 
     console.log(`✅ Import completed successfully in ${processingTime}ms`)
     console.log(`🆕 Created product ID: ${creationResult.productId}`)

@@ -8,8 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Chrome, Loader2, Mail } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useSession } from '@/components/providers/session-provider'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 
 interface LoginModalProps {
   open: boolean
@@ -18,7 +18,6 @@ interface LoginModalProps {
 
 export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const router = useRouter()
-  const { update } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,30 +35,14 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/auth/signin/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include'
+      await signIn('credentials', {
+        email,
+        password,
+        callbackUrl: '/dashboard',
       })
-
-      const data = await res.json()
-      
-      if (!res.ok) {
-        setError(data.error || 'Invalid email or password')
-        setIsLoading(false)
-        return
-      }
-
-      // Refresh session
-      await update()
-      
-      // Close modal and navigate
-      onOpenChange(false)
-      router.push('/dashboard')
-      router.refresh()
+      // Redirect happens automatically, this code won't execute on success
     } catch (error) {
-      setError('Something went wrong. Please try again.')
+      setError('Invalid email or password')
       setIsLoading(false)
     }
   }
@@ -70,6 +53,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
     setIsLoading(true)
 
     try {
+      // First create the account
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,13 +69,13 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
 
-      // Refresh session
-      await update()
-      
-      // Close modal and navigate
-      onOpenChange(false)
-      router.push('/dashboard')
-      router.refresh()
+      // Then sign in with the new credentials
+      await signIn('credentials', {
+        email,
+        password,
+        callbackUrl: '/dashboard',
+      })
+      // Redirect happens automatically, this code won't execute on success
     } catch (error) {
       setError('Something went wrong. Please try again.')
       setIsLoading(false)

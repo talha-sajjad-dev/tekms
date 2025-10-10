@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useSession } from "@/components/providers/session-provider"
+import { useSession } from "next-auth/react"
 import { UserMenu } from "@/components/auth/user-menu"
 import { Button } from "@/components/ui/button"
 import { LoginModal } from "@/components/auth/login-modal"
