@@ -35,7 +35,8 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
       const res = await fetch('/api/auth/signin/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        credentials: 'include' // Important: include cookies
       })
 
       const data = await res.json()
@@ -46,7 +47,8 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
 
-      window.location.href = '/dashboard'
+      // Force full page reload to refresh session
+      window.location.replace('/dashboard')
     } catch (error) {
       setError('Something went wrong. Please try again.')
       setIsLoading(false)
@@ -62,7 +64,8 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name })
+        body: JSON.stringify({ email, password, name }),
+        credentials: 'include' // Important: include cookies
       })
 
       const data = await res.json()
@@ -73,8 +76,8 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
 
-      // Auto sign-in after signup
-      window.location.href = '/dashboard'
+      // Force full page reload to refresh session
+      window.location.replace('/dashboard')
     } catch (error) {
       setError('Something went wrong. Please try again.')
       setIsLoading(false)
