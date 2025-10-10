@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 interface User {
   id: string
@@ -18,11 +18,13 @@ interface Session {
 interface SessionContextValue {
   data: Session | null
   status: 'loading' | 'authenticated' | 'unauthenticated'
+  update: () => Promise<void>
 }
 
 const SessionContext = createContext<SessionContextValue>({
   data: null,
   status: 'loading',
+  update: async () => {},
 })
 
 export function useSession() {
@@ -33,30 +35,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading')
 
-  useEffect(() => {
-    // Fetch session from our API
-    fetch('/api/auth/session')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch session')
-        return res.json()
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/session', {
+        credentials: 'include'
       })
-      .then(data => {
-        if (data && data.user) {
-          setSession(data)
-          setStatus('authenticated')
-        } else {
-          setSession(null)
-          setStatus('unauthenticated')
-        }
-      })
-      .catch(() => {
+      
+      if (!res.ok) throw new Error('Failed to fetch session')
+      
+      const data = await res.json()
+      
+      if (data && data.user) {
+        setSession(data)
+        setStatus('authenticated')
+      } else {
         setSession(null)
         setStatus('unauthenticated')
-      })
+      }
+    } catch (error) {
+      setSession(null)
+      setStatus('unauthenticated')
+    }
   }, [])
 
+  useEffect(() => {
+    fetchSession()
+  }, [fetchSession])
+
   return (
-    <SessionContext.Provider value={{ data: session, status }}>
+    <SessionContext.Provider value={{ data: session, status, update: fetchSession }}>
       {children}
     </SessionContext.Provider>
   )

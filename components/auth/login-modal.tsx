@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Chrome, Loader2, Mail } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSession } from '@/components/providers/session-provider'
+import { useRouter } from 'next/navigation'
 
 interface LoginModalProps {
   open: boolean
@@ -15,6 +17,8 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onOpenChange }: LoginModalProps) {
+  const router = useRouter()
+  const { update } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,7 +40,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        credentials: 'include' // Important: include cookies
+        credentials: 'include'
       })
 
       const data = await res.json()
@@ -47,8 +51,13 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
 
-      // Force full page reload to refresh session
-      window.location.replace('/dashboard')
+      // Refresh session
+      await update()
+      
+      // Close modal and navigate
+      onOpenChange(false)
+      router.push('/dashboard')
+      router.refresh()
     } catch (error) {
       setError('Something went wrong. Please try again.')
       setIsLoading(false)
@@ -65,7 +74,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name }),
-        credentials: 'include' // Important: include cookies
+        credentials: 'include'
       })
 
       const data = await res.json()
@@ -76,8 +85,13 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         return
       }
 
-      // Force full page reload to refresh session
-      window.location.replace('/dashboard')
+      // Refresh session
+      await update()
+      
+      // Close modal and navigate
+      onOpenChange(false)
+      router.push('/dashboard')
+      router.refresh()
     } catch (error) {
       setError('Something went wrong. Please try again.')
       setIsLoading(false)
