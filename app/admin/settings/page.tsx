@@ -103,7 +103,8 @@ export default function AdminSettingsPage() {
           title: 'Settings Saved',
           description: `${category} settings have been updated successfully`
         })
-        fetchSettings()
+        // Don't refetch immediately - settings are already updated in local state
+        // This prevents the "disappearing" issue where refetch happens too quickly
       } else {
         toast({
           title: 'Error',
@@ -432,62 +433,77 @@ export default function AdminSettingsPage() {
 
           {/* OAuth Settings */}
           <TabsContent value="oauth" className="space-y-4">
-            {['shopify', 'etsy', 'bigcommerce', 'tiktok'].map((platform) => (
-              <Card key={platform}>
-                <CardHeader>
-                  <CardTitle className="capitalize">{platform} OAuth</CardTitle>
-                  <CardDescription>
-                    OAuth credentials for {platform} integration
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`${platform}_client_id`}>Client ID</Label>
-                    <Input
-                      id={`${platform}_client_id`}
-                      value={getSetting(`${platform}_client_id`)}
-                      onChange={(e) => updateSetting(`${platform}_client_id`, e.target.value)}
-                      placeholder="..."
-                      className="font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`${platform}_client_secret`}>Client Secret</Label>
-                    <div className="flex gap-2">
+            {['shopify', 'etsy', 'bigcommerce', 'tiktok'].map((platform) => {
+              const isEtsy = platform === 'etsy'
+              const clientIdLabel = isEtsy ? 'Keystring' : 'Client ID'
+              const clientSecretLabel = isEtsy ? 'Shared Secret' : 'Client Secret'
+              const clientIdPlaceholder = isEtsy ? 'Your Etsy Keystring' : 'OAuth Client ID'
+              
+              return (
+                <Card key={platform}>
+                  <CardHeader>
+                    <CardTitle className="capitalize">{platform} OAuth</CardTitle>
+                    <CardDescription>
+                      {isEtsy ? 'Etsy API v3 credentials' : `OAuth credentials for ${platform} integration`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`${platform}_client_id`}>{clientIdLabel}</Label>
                       <Input
-                        id={`${platform}_client_secret`}
-                        type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
-                        value={getSetting(`${platform}_client_secret`)}
-                        onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
-                        placeholder="..."
+                        id={`${platform}_client_id`}
+                        value={getSetting(`${platform}_client_id`)}
+                        onChange={(e) => updateSetting(`${platform}_client_id`, e.target.value)}
+                        placeholder={clientIdPlaceholder}
                         className="font-mono"
                       />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => toggleShowSecret(`${platform}_client_secret`)}
-                      >
-                        {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                      {isEtsy && (
+                        <p className="text-xs text-gray-500">
+                          From Etsy Developer Portal → Apps → Your App
+                        </p>
+                      )}
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
-                    <Input
-                      id={`${platform}_redirect_uri`}
-                      value={getSetting(`${platform}_redirect_uri`)}
-                      onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
-                      placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="space-y-2">
+                      <Label htmlFor={`${platform}_client_secret`}>{clientSecretLabel}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`${platform}_client_secret`}
+                          type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
+                          value={getSetting(`${platform}_client_secret`)}
+                          onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
+                          placeholder="..."
+                          className="font-mono"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => toggleShowSecret(`${platform}_client_secret`)}
+                        >
+                          {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
 
-            <Button 
-              onClick={() => handleSave('oauth')} 
+                    <div className="space-y-2">
+                      <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
+                      <Input
+                        id={`${platform}_redirect_uri`}
+                        value={getSetting(`${platform}_redirect_uri`)}
+                        onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
+                        placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
+                      />
+                      <p className="text-xs text-gray-500">
+                        Copy this URL to your {platform} app configuration
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+
+            <Button
+              onClick={() => handleSave('oauth')}
               disabled={saving}
               className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
             >
