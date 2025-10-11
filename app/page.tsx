@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { AuthModal } from "@/components/auth/auth-modal"
 import { HomepageNav } from "@/components/homepage-nav"
+import { PricingCalculator } from "@/components/pricing-calculator"
 import {
   ShoppingCart,
   Zap,
@@ -213,7 +214,6 @@ export default function HomePage() {
 
       {/* Pricing Section */}
       <div id="pricing" className="relative py-20 md:py-28 overflow-hidden bg-[#F8FAFC]">
-        
         <div className="relative container mx-auto px-4">
           <div className="text-center mb-16">
             <Badge variant="outline" className="mb-4 text-blue-600 border-blue-200 bg-blue-50">
@@ -222,73 +222,14 @@ export default function HomePage() {
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-[#0F172A]">
               Simple, <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Flexible</span> Pricing
             </h2>
-            <p className="text-xl text-[#64748B] max-w-3xl mx-auto mb-4">
-              Connect unlimited stores. Pay per store based on product count.
-            </p>
-            <p className="text-base text-[#64748B] max-w-2xl mx-auto">
-              Each store automatically upgrades tiers as you add products: $10 (1-100), $20 (101-500), $30 (501-1K), $40 (1K-2.5K), $50 (2.5K+)
+            <p className="text-xl text-[#64748B] max-w-3xl mx-auto">
+              See exactly what you'll pay per store based on your product count
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {plans.map((plan, index) => (
-              <Card 
-                key={index} 
-                className={`relative group hover:-translate-y-2 transition-all duration-300 bg-white ${
-                  plan.popular 
-                    ? 'border-2 border-blue-500 shadow-2xl shadow-blue-200/50 scale-105' 
-                    : 'border-2 border-[#E2E8F0] hover:border-blue-200 hover:shadow-xl'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-5 left-0 right-0 flex justify-center">
-                    <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-6 py-1 text-sm font-semibold shadow-lg">
-                      ⭐ Most Popular
-                    </Badge>
-                  </div>
-                )}
-                <CardHeader className="text-center pb-8 pt-8">
-                  <CardTitle className="text-2xl mb-2 text-[#0F172A]">{plan.name}</CardTitle>
-                  <CardDescription className="text-base text-[#64748B]">{plan.description}</CardDescription>
-                  <div className="mt-6">
-                    <div className="flex items-baseline justify-center gap-2">
-                      <span className="text-5xl font-black bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                        {plan.price}
-                      </span>
-                      <span className="text-[#64748B] text-lg">/month</span>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ul className="space-y-4 mb-8">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <div className="rounded-full bg-blue-50 p-1 mt-0.5">
-                          <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <span className="text-sm text-[#334155] leading-relaxed">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button 
-                    className={`w-full py-6 font-semibold text-base ${
-                      plan.popular 
-                        ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-lg hover:shadow-xl' 
-                        : 'border-2 border-[#E2E8F0] hover:bg-blue-50 text-[#0F172A]'
-                    }`}
-                    variant={plan.popular ? "default" : "outline"}
-                    onClick={() => setShowAuthModal(true)}
-                  >
-                    {plan.popular ? 'Start Free Trial' : 'Get Started'}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="max-w-4xl mx-auto">
+            <PricingCalculator onGetStarted={() => setShowAuthModal(true)} />
           </div>
-          
-          <p className="text-center mt-12 text-sm text-[#64748B]">
-            Start free with 10 products. Add stores and scale as you grow. No credit card required to start.
-          </p>
         </div>
       </div>
 
