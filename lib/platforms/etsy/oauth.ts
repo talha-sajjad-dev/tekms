@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { encrypt } from '@/lib/encryption'
+import { getSetting } from '@/lib/settings'
 import crypto from 'crypto'
 
 /**
@@ -7,20 +8,24 @@ import crypto from 'crypto'
  * @param state - CSRF protection state token
  */
 export async function getEtsyAuthUrl(state: string): Promise<string> {
-  const clientId = process.env.ETSY_CLIENT_ID
+  // Get client ID from database settings (Etsy calls this "Keystring")
+  const clientId = await getSetting('etsy_client_id', process.env.ETSY_CLIENT_ID || '')
   
   if (!clientId) {
-    throw new Error('ETSY_CLIENT_ID not configured')
+    throw new Error('Etsy API Key not configured. Please configure it in Admin > System Settings > OAuth.')
   }
+  
+  // Redirect URI is NOT stored in database for Etsy - it's just the app URL
+  const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/callback/etsy`
   
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/etsy`,
-    scope: 'listings_r listings_w shops_r transactions_r', // Required scopes
+    redirect_uri: redirectUri,
+    scope: 'listings_r listings_w shops_r transactions_r',
     state: state,
-    code_challenge_method: 'S256', // PKCE for security
-    code_challenge: generateCodeChallenge(state), // Use state as verifier for simplicity
+    code_challenge_method: 'S256',
+    code_challenge: generateCodeChallenge(state),
   })
   
   return `https://www.etsy.com/oauth/connect?${params.toString()}`
@@ -37,22 +42,26 @@ export async function handleEtsyCallback(
   userId: string,
   codeVerifier: string
 ): Promise<{ success: boolean; storeName: string; storeId: string }> {
-  const clientId = process.env.ETSY_CLIENT_ID
+  // Get client ID from database settings
+  const clientId = await getSetting('etsy_client_id', process.env.ETSY_CLIENT_ID || '')
   
   if (!clientId) {
-    throw new Error('ETSY_CLIENT_ID not configured')
+    throw new Error('Etsy API Key not configured')
   }
+  
+  // Redirect URI is NOT from database - just use app URL
+  const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/callback/etsy`
   
   // Exchange code for access token
   const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: clientId,
-      redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/etsy`,
+      redirect_uri: redirectUri,
       code: code,
       code_verifier: codeVerifier,
     }),
@@ -190,10 +199,11 @@ export async function handleEtsyCallback(
  * @param refreshToken - Encrypted refresh token
  */
 export async function refreshEtsyToken(refreshToken: string): Promise<string> {
-  const clientId = process.env.ETSY_CLIENT_ID
+  // Get client ID from database settings
+  const clientId = await getSetting('etsy_client_id', process.env.ETSY_CLIENT_ID || '')
   
   if (!clientId) {
-    throw new Error('ETSY_CLIENT_ID not configured')
+    throw new Error('Etsy API Key not configured')
   }
   
   const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
