@@ -18,6 +18,8 @@ interface AuthModalProps {
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [loginError, setLoginError] = useState("")
+  const [signupError, setSignupError] = useState("")
   const { toast } = useToast()
 
   const [loginData, setLoginData] = useState({
@@ -53,6 +55,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setLoginError("")
 
     try {
       const result = await signIn("credentials", {
@@ -62,9 +65,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
       })
 
       if (result?.error) {
+        const errorMsg = "Invalid email or password"
+        setLoginError(errorMsg)
         toast({
           title: "Error",
-          description: "Invalid email or password",
+          description: errorMsg,
           variant: "destructive",
         })
       } else {
@@ -76,9 +81,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         window.location.href = "/dashboard"
       }
     } catch (error) {
+      const errorMsg = "An error occurred. Please try again."
+      setLoginError(errorMsg)
       toast({
         title: "Error",
-        description: "An error occurred. Please try again.",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -88,20 +95,25 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSignupError("")
 
     if (signupData.password !== signupData.confirmPassword) {
+      const errorMsg = "Passwords do not match"
+      setSignupError(errorMsg)
       toast({
         title: "Error",
-        description: "Passwords do not match",
+        description: errorMsg,
         variant: "destructive",
       })
       return
     }
 
     if (signupData.password.length < 8) {
+      const errorMsg = "Password must be at least 8 characters"
+      setSignupError(errorMsg)
       toast({
         title: "Error",
-        description: "Password must be at least 8 characters",
+        description: errorMsg,
         variant: "destructive",
       })
       return
@@ -137,10 +149,13 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
 
       // Pre-fill login email
       setLoginData({ ...loginData, email: signupData.email })
+      setSignupError("")
     } catch (error: any) {
+      const errorMsg = error.message || "Failed to create account"
+      setSignupError(errorMsg)
       toast({
         title: "Error",
-        description: error.message || "Failed to create account",
+        description: errorMsg,
         variant: "destructive",
       })
     } finally {
@@ -191,6 +206,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
+              {loginError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {loginError}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
                 <Input
@@ -198,9 +218,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   type="email"
                   placeholder="name@example.com"
                   value={loginData.email}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setLoginData({ ...loginData, email: e.target.value })
-                  }
+                    setLoginError("")
+                  }}
                   required
                 />
               </div>
@@ -210,9 +231,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   id="login-password"
                   type="password"
                   value={loginData.password}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setLoginData({ ...loginData, password: e.target.value })
-                  }
+                    setLoginError("")
+                  }}
                   required
                 />
               </div>
@@ -252,6 +274,11 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             </div>
 
             <form onSubmit={handleSignup} className="space-y-4">
+              {signupError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {signupError}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="signup-name">Name</Label>
                 <Input
@@ -259,9 +286,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   type="text"
                   placeholder="John Doe"
                   value={signupData.name}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSignupData({ ...signupData, name: e.target.value })
-                  }
+                    setSignupError("")
+                  }}
                   required
                 />
               </div>
@@ -272,9 +300,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   type="email"
                   placeholder="name@example.com"
                   value={signupData.email}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSignupData({ ...signupData, email: e.target.value })
-                  }
+                    setSignupError("")
+                  }}
                   required
                 />
               </div>
@@ -285,9 +314,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   type="password"
                   placeholder="Min. 8 characters"
                   value={signupData.password}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSignupData({ ...signupData, password: e.target.value })
-                  }
+                    setSignupError("")
+                  }}
                   required
                 />
               </div>
@@ -297,12 +327,13 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
                   id="signup-confirm"
                   type="password"
                   value={signupData.confirmPassword}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setSignupData({
                       ...signupData,
                       confirmPassword: e.target.value,
                     })
-                  }
+                    setSignupError("")
+                  }}
                   required
                 />
               </div>

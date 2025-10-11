@@ -71,6 +71,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // Allow sign in
+      return true
+    },
+    async redirect({ url, baseUrl }) {
+      // Always redirect to dashboard after successful login
+      // unless a specific URL was requested
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`
+      } else if (new URL(url).origin === baseUrl) {
+        return url
+      }
+      return `${baseUrl}/dashboard`
+    },
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
