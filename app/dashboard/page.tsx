@@ -1,16 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession, signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { UserNav } from "@/components/user-nav"
 import {
   Package,
-  Settings,
-  LogOut,
   BarChart3,
   ShoppingBag,
   Key,
@@ -124,18 +123,7 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/settings")}>
-                <Settings className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => signOut({ callbackUrl: "/" })}
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
+            <UserNav />
           </div>
         </div>
       </header>
