@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your Prisma schema file for TEKMS Listing Manager
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -10,25 +10,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ User Management ============
+// ============================================
+// AUTHENTICATION & USER MANAGEMENT
+// ============================================
 
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
+  password      String?   // For credential login (hashed with bcrypt)
   emailVerified DateTime?
-  password      String?   // For email/password authentication
   image         String?
   role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
+  
+  // Relations
   accounts      Account[]
   sessions      Session[]
-  credentials   UserCredential[]
   subscription  Subscription?
-  usage         UsageRecord[]
-
+  credentials   UserCredential[]
+  usageRecords  UsageRecord[]
+  products      Product[]
+  syncJobs      SyncJob[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@index([email])
 }
 
@@ -37,8 +43,7 @@ enum UserRole {
   ADMIN
 }
 
-// ============ NextAuth Models ============
-
+// OAuth Accounts (Google, etc.)
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -52,32 +57,37 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
+  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
 
+// Sessions for NextAuth
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@index([userId])
 }
 
+// Email verification tokens
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
+  
   @@unique([identifier, token])
 }
 
-// ============ Subscription Management ============
+// ============================================
+// SUBSCRIPTIONS & BILLING
+// ============================================
 
 model Subscription {
   id                     String             @id @default(cuid())
@@ -89,11 +99,12 @@ model Subscription {
   tier                   SubscriptionTier   @default(FREE)
   status                 SubscriptionStatus @default(ACTIVE)
   cancelAtPeriodEnd      Boolean            @default(false)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-
+  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@index([userId])
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -116,31 +127,148 @@ enum SubscriptionStatus {
   UNPAID
 }
 
-// ============ API Credentials Storage ============
+// Dynamic Pricing Plans (Admin Manageable)
+model PricingPlan {
+  id              String   @id @default(cuid())
+  tier            SubscriptionTier @unique
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  yearlyPrice     Decimal? @db.Decimal(10, 2)
+  stripePriceId   String?
+  stripeYearlyPriceId String?
+  
+  // Limits
+  productLimit    Int      // -1 for unlimited
+  apiCallLimit    Int?
+  storageLimit    Int?
+  
+  // Features (stored as JSON array)
+  features        Json
+  
+  // Platform Access
+  allowBigCommerce Boolean @default(true)
+  allowShopify     Boolean @default(true)
+  allowEtsy        Boolean @default(false)
+  allowTikTok      Boolean @default(false)
+  
+  // Special Features
+  allowBulkOps     Boolean @default(false)
+  allowScheduledSync Boolean @default(false)
+  allowAdvancedAnalytics Boolean @default(false)
+  allowPrioritySupport Boolean @default(false)
+  allowAPIAccess   Boolean @default(false)
+  
+  // Display
+  isActive        Boolean @default(true)
+  displayOrder    Int     @default(0)
+  isPopular       Boolean @default(false)
+  badgeText       String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tier])
+  @@index([isActive, displayOrder])
+}
+
+// ============================================
+// PLATFORM CREDENTIALS
+// ============================================
 
 model UserCredential {
   id           String   @id @default(cuid())
   userId       String
   platform     Platform
-  encryptedKey String   @db.Text
+  encryptedKey String   @db.Text // AES-256-GCM encrypted
   label        String?
   isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@unique([userId, platform, label])
   @@index([userId, platform])
 }
 
 enum Platform {
   BIGCOMMERCE
+  SHOPIFY
   TIKTOK
   ETSY
 }
 
-// ============ Usage Tracking ============
+// ============================================
+// PRODUCTS & SYNC
+// ============================================
+
+model Product {
+  id               String   @id @default(cuid())
+  userId           String
+  platform         Platform
+  externalId       String
+  
+  // Core fields
+  name             String
+  description      String?  @db.Text
+  sku              String?
+  price            Decimal  @db.Decimal(10, 2)
+  compareAtPrice   Decimal? @db.Decimal(10, 2)
+  
+  // Search optimization
+  searchVector     String?
+  categories       String[]
+  tags             String[]
+  
+  // Metadata
+  images           Json?
+  variants         Json?
+  customFields     Json?
+  
+  // Sync status
+  lastSyncedAt     DateTime?
+  syncStatus       String?
+  syncError        String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, platform, externalId])
+  @@index([userId, platform])
+  @@index([userId, createdAt])
+}
+
+model SyncJob {
+  id          String   @id @default(cuid())
+  userId      String
+  platform    Platform
+  action      String
+  status      String
+  
+  totalItems     Int @default(0)
+  processedItems Int @default(0)
+  failedItems    Int @default(0)
+  
+  results     Json?
+  errorLog    String? @db.Text
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+// ============================================
+// USAGE TRACKING
+// ============================================
 
 model UsageRecord {
   id           String    @id @default(cuid())
@@ -149,10 +277,54 @@ model UsageRecord {
   productCount Int       @default(1)
   platform     Platform?
   metadata     Json?
-  createdAt    DateTime  @default(now())
-
+  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
+  createdAt DateTime @default(now())
+  
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+// ============================================
+// EMAIL LOGS
+// ============================================
+
+model EmailLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  to          String
+  subject     String
+  template    String
+  status      String
+  provider    String   @default("resend")
+  providerId  String?
+  error       String?  @db.Text
+  metadata    Json?
+  
+  sentAt      DateTime @default(now())
+  
+  @@index([userId, sentAt])
+  @@index([status])
+  @@index([sentAt])
+}
+
+// ============================================
+// ADMIN SETTINGS
+// ============================================
+
+model Settings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @db.Text
+  type  String @default("string") // string, number, boolean, json
+  category String @default("general") // general, stripe, email, integrations
+  description String?
+  isPublic Boolean @default(false) // Can be accessed by non-admin users
+  
+  updatedAt DateTime @updatedAt
+  updatedBy String? // userId who last updated
+  
+  @@index([category])
+  @@index([key])
 }

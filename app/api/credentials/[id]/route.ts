@@ -1,96 +1,115 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { decryptCredentialObject } from '@/lib/encryption/credentials'
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/db"
 
-/**
- * GET /api/credentials/[id]
- * Get a specific credential (with decrypted data)
- */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await auth()
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const credential = await prisma.userCredential.findFirst({
-      where: {
-        id: params.id,
-        userId: session.user.id,
-        isActive: true,
-      },
-    })
-
-    if (!credential) {
-      return NextResponse.json(
-        { error: 'Credential not found' },
-        { status: 404 }
-      )
-    }
-
-    // Decrypt the credentials
-    const decryptedCredentials = decryptCredentialObject(credential.encryptedKey)
-
-    return NextResponse.json({
-      id: credential.id,
-      platform: credential.platform,
-      label: credential.label,
-      credentials: decryptedCredentials,
-      createdAt: credential.createdAt,
-      updatedAt: credential.updatedAt,
-    })
-  } catch (error) {
-    console.error('Error fetching credential:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch credential' },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * DELETE /api/credentials/[id]
- * Delete a credential (soft delete)
- */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await auth()
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
     }
 
-    const credential = await prisma.userCredential.findFirst({
-      where: {
-        id: params.id,
-        userId: session.user.id,
-      },
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
     })
 
-    if (!credential) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Credential not found' },
+        { error: "User not found" },
         { status: 404 }
       )
     }
 
-    // Soft delete by marking as inactive
-    await prisma.userCredential.update({
+    // Check if credential belongs to user
+    const credential = await prisma.userCredential.findUnique({
       where: { id: params.id },
-      data: { isActive: false },
+    })
+
+    if (!credential || credential.userId !== user.id) {
+      return NextResponse.json(
+        { error: "Credential not found" },
+        { status: 404 }
+      )
+    }
+
+    await prisma.userCredential.delete({
+      where: { id: params.id },
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting credential:', error)
+  } catch (error: any) {
+    console.error("Delete credential error:", error)
     return NextResponse.json(
-      { error: 'Failed to delete credential' },
+      { error: "Failed to delete credential" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await auth()
+    
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
+    }
+
+    const { isActive } = await req.json()
+
+    // Check if credential belongs to user
+    const credential = await prisma.userCredential.findUnique({
+      where: { id: params.id },
+    })
+
+    if (!credential || credential.userId !== user.id) {
+      return NextResponse.json(
+        { error: "Credential not found" },
+        { status: 404 }
+      )
+    }
+
+    const updated = await prisma.userCredential.update({
+      where: { id: params.id },
+      data: { isActive },
+      select: {
+        id: true,
+        platform: true,
+        label: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    return NextResponse.json({ credential: updated })
+  } catch (error: any) {
+    console.error("Update credential error:", error)
+    return NextResponse.json(
+      { error: "Failed to update credential" },
       { status: 500 }
     )
   }

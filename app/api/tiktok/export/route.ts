@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { readTikTokTemplate, createTikTokExcel } from '@/lib/tiktok/excel-utils'
 import { batchProcessProducts } from '@/lib/tiktok/data-mapper'
-import { enforceUsageLimit, trackUsage } from '@/lib/usage/tracker'
 
 // BigCommerce API configuration
 const STORE_HASH = process.env.BIGCOMMERCE_STORE_HASH || "t48lqqxd8a"
@@ -17,15 +15,6 @@ const headers = {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({
-        success: false,
-        error: 'Unauthorized'
-      }, { status: 401 })
-    }
-
     const body = await request.json()
     const { productIds, selectedGroups, includeVariants = true } = body
     
@@ -33,22 +22,6 @@ export async function POST(request: NextRequest) {
     console.log('Product IDs:', productIds?.length || 'Not specified')
     console.log('Selected Groups:', selectedGroups?.length || 'Not specified')
     console.log('Include variants:', includeVariants)
-
-    // Calculate product count for usage tracking
-    const productCount = productIds?.length || 0
-    
-    // Check usage limit before processing
-    if (productCount > 0) {
-      try {
-        await enforceUsageLimit(session.user.id, productCount)
-      } catch (error) {
-        return NextResponse.json({
-          success: false,
-          error: error instanceof Error ? error.message : 'Usage limit exceeded',
-          limitExceeded: true
-        }, { status: 403 })
-      }
-    }
     
     // Read the template
     const template = await readTikTokTemplate()
@@ -145,21 +118,6 @@ export async function POST(request: NextRequest) {
     const tiktokProducts = batchProcessProducts(products, categoryMapping)
     
     console.log(`Processed ${tiktokProducts.length} TikTok products (including variants)`)
-    
-    // Track usage (count base products exported, not variants)
-    if (products.length > 0) {
-      await trackUsage({
-        userId: session.user.id,
-        action: 'TIKTOK_EXPORT',
-        productCount: products.length,
-        platform: 'TIKTOK',
-        metadata: {
-          productsExported: products.length,
-          tiktokProductsGenerated: tiktokProducts.length,
-          includeVariants
-        }
-      })
-    }
     
     // Create Excel file with TikTok products (preserving template data)
     const excelBuffer = await createTikTokExcel(tiktokProducts, template)
