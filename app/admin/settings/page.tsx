@@ -54,11 +54,12 @@ export default function AdminSettingsPage() {
           variant: 'destructive'
         })
         router.push('/dashboard')
-      } else {
+      } else if (settings.length === 0) {
+        // Only fetch if we don't have settings yet
         fetchSettings()
       }
     }
-  }, [status, session])
+  }, [status, session, settings.length])
 
   const fetchSettings = async () => {
     try {
