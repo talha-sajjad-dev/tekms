@@ -6,15 +6,16 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Settings, 
-  Users, 
-  DollarSign, 
+import {
+  Settings,
+  Users,
+  DollarSign,
   Shield,
   ArrowLeft,
   Store,
   Package,
-  BarChart3
+  BarChart3,
+  FileText
 } from 'lucide-react'
 
 export default function AdminDashboardPage() {
@@ -49,6 +50,14 @@ export default function AdminDashboardPage() {
       href: '/admin/settings',
       color: 'from-blue-600 to-cyan-600',
       badge: 'Essential'
+    },
+    {
+      title: 'Page Management',
+      description: 'Edit footer pages, legal docs, and website content',
+      icon: FileText,
+      href: '/admin/pages',
+      color: 'from-cyan-600 to-blue-600',
+      badge: null
     },
     {
       title: 'Pricing Tiers',
@@ -137,7 +146,7 @@ export default function AdminDashboardPage() {
               key={index}
               className="hover:shadow-lg transition-all cursor-pointer border-blue-100 bg-white/80 backdrop-blur-sm group"
               onClick={() => {
-                if (!card.badge || card.badge === 'Essential') {
+                if (!card.badge || card.badge === 'Essential' || card.badge === null) {
                   router.push(card.href)
                 }
               }}

@@ -454,3 +454,26 @@ model Settings {
   @@index([category])
   @@index([key])
 }
+
+// ============================================
+// PAGE CONTENT MANAGEMENT
+// ============================================
+
+model Page {
+  id          String  @id @default(cuid())
+  slug        String  @unique // URL slug (e.g., "about", "contact")
+  title       String
+  content     String  @db.Text // HTML content from WYSIWYG editor
+  metaTitle   String?
+  metaDescription String?
+  isPublished Boolean @default(true)
+  isFooterLink Boolean @default(false) // Show in footer
+  displayOrder Int    @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // userId who last updated
+  
+  @@index([slug])
+  @@index([isPublished, isFooterLink])
+}
