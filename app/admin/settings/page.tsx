@@ -444,7 +444,7 @@ export default function AdminSettingsPage() {
                   <CardHeader>
                     <CardTitle className="capitalize">{platform} OAuth</CardTitle>
                     <CardDescription>
-                      {isEtsy ? 'Etsy API v3 uses PKCE (no client secret needed)' : `OAuth credentials for ${platform} integration`}
+                      {isEtsy ? 'Etsy API v3 - Only need API Key from developer portal' : `OAuth credentials for ${platform} integration`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -466,52 +466,56 @@ export default function AdminSettingsPage() {
                     </div>
 
                     {!isEtsy && (
-                      <div className="space-y-2">
-                        <Label htmlFor={`${platform}_client_secret`}>Client Secret</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id={`${platform}_client_secret`}
-                            type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
-                            value={getSetting(`${platform}_client_secret`)}
-                            onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
-                            placeholder="..."
-                            className="font-mono"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => toggleShowSecret(`${platform}_client_secret`)}
-                          >
-                            {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor={`${platform}_client_secret`}>Client Secret</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id={`${platform}_client_secret`}
+                              type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
+                              value={getSetting(`${platform}_client_secret`)}
+                              onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
+                              placeholder="..."
+                              className="font-mono"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => toggleShowSecret(`${platform}_client_secret`)}
+                            >
+                              {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            OAuth client secret (encrypted in database)
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500">
-                          OAuth client secret (encrypted in database)
-                        </p>
-                      </div>
-                    )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
-                      <Input
-                        id={`${platform}_redirect_uri`}
-                        value={getSetting(`${platform}_redirect_uri`)}
-                        onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
-                        placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-gray-500">
-                        {isEtsy
-                          ? 'Must match EXACTLY in Etsy Developer Portal (no trailing slash)'
-                          : `Register this URL in your ${platform} app configuration`
-                        }
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
+                          <Input
+                            id={`${platform}_redirect_uri`}
+                            value={getSetting(`${platform}_redirect_uri`)}
+                            onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
+                            placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
+                            className="font-mono text-sm"
+                          />
+                          <p className="text-xs text-gray-500">
+                            Register this URL in your {platform} app configuration
+                          </p>
+                        </div>
+                      </>
+                    )}
                     
                     {isEtsy && (
                       <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
-                        <p className="font-semibold mb-1">✓ Etsy uses PKCE for security</p>
-                        <p className="text-xs">Etsy doesn't require a client secret. We automatically generate code_challenge and code_verifier for each OAuth request.</p>
+                        <p className="font-semibold mb-1">✓ Etsy OAuth is Simple!</p>
+                        <ul className="text-xs space-y-1 mt-2">
+                          <li>• Only need your API Keystring above</li>
+                          <li>• No client secret (uses PKCE security)</li>
+                          <li>• No redirect URI registration in portal</li>
+                          <li>• Our app handles everything else automatically</li>
+                        </ul>
                       </div>
                     )}
                   </CardContent>
