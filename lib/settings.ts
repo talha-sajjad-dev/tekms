@@ -167,18 +167,35 @@ export async function getStripeKeys() {
 }
 
 export async function getEmailConfig() {
-  const [provider, apiKey, fromEmail, fromName] = await Promise.all([
-    getSetting('email_provider', process.env.EMAIL_PROVIDER || 'resend'),
+  const [
+    provider,
+    apiKey,
+    fromEmail,
+    fromName,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPassword
+  ] = await Promise.all([
+    getSetting('email_provider', process.env.EMAIL_PROVIDER || 'smtp'),
     getSetting('email_api_key', process.env.RESEND_API_KEY),
     getSetting('email_from_address', process.env.EMAIL_FROM || 'noreply@tekms.com'),
     getSetting('email_from_name', 'TEKMS Listing Manager'),
+    getSetting('email_smtp_host', process.env.SMTP_HOST || 'smtp.zoho.com'),
+    getSetting('email_smtp_port', process.env.SMTP_PORT || '465'),
+    getSetting('email_smtp_user', process.env.SMTP_USER),
+    getSetting('email_smtp_password', process.env.SMTP_PASSWORD),
   ])
   
   return {
     provider,
     apiKey,
     fromEmail,
-    fromName
+    fromName,
+    smtp_host: smtpHost,
+    smtp_port: parseInt(smtpPort || '465'),
+    smtp_user: smtpUser,
+    smtp_password: smtpPassword,
   }
 }
 
