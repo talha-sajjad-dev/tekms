@@ -1,0 +1,70 @@
+# TEKMS - Quick Deployment Commands
+# Copy and paste these commands when SSH'd into production server
+
+# ============================================
+# STEP 1: UPDATE PRODUCTION .ENV
+# ============================================
+cd /home/tekms/tekms-app
+nano .env
+
+# Update these two lines:
+# NEXTAUTH_URL="https://tekms.com"
+# APP_URL="https://tekms.com"
+# NODE_ENV="production"
+
+# Save and exit (Ctrl+X, Y, Enter)
+
+
+# ============================================
+# STEP 2: RUN DEPLOYMENT SCRIPT
+# ============================================
+chmod +x /home/tekms/tekms-app/deploy.sh
+./deploy.sh
+
+
+# ============================================
+# STEP 3: VERIFY DEPLOYMENT
+# ============================================
+pm2 status
+pm2 logs tekms --lines 50
+
+
+# ============================================
+# STEP 4: UPDATE PM2 ENV (if needed)
+# ============================================
+pm2 restart tekms --update-env
+pm2 save
+
+
+# ============================================
+# STEP 5: TEST PRODUCTION
+# ============================================
+curl https://tekms.com/api/health
+curl https://tekms.com
+
+
+# ============================================
+# MONITORING COMMANDS
+# ============================================
+pm2 logs tekms              # Real-time logs
+pm2 logs tekms --err        # Error logs only
+pm2 monit                   # Live monitoring
+pm2 list                    # Process list
+
+
+# ============================================
+# TROUBLESHOOTING
+# ============================================
+# If build fails:
+rm -rf .next node_modules
+npm install --legacy-peer-deps
+npm run build
+pm2 restart tekms
+
+# If database issues:
+npx prisma migrate status
+npx prisma migrate deploy
+
+# If environment issues:
+pm2 restart tekms --update-env
+pm2 save

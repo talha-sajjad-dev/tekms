@@ -273,6 +273,7 @@ export async function autoUpgradeStoreIfNeeded(
 
 /**
  * Get user's total monthly bill (sum of all store subscriptions)
+ * Note: This function doesn't require Stripe API, only database access
  */
 export async function getUserTotalBill(userId: string): Promise<{
   total: number
@@ -285,6 +286,7 @@ export async function getUserTotalBill(userId: string): Promise<{
     price: number
   }>
 }> {
+  // This function only queries database, no Stripe API calls needed
   const stores = await db.storeConnection.findMany({
     where: { userId, isActive: true },
     include: {
