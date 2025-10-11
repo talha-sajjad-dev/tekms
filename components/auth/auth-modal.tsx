@@ -35,14 +35,51 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     try {
-      await signIn("google", { callbackUrl: "/dashboard" })
+      // Open popup window for OAuth
+      const width = 500
+      const height = 600
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+      
+      const popup = window.open(
+        `/api/auth/signin/google?callbackUrl=${encodeURIComponent('/dashboard')}`,
+        'Google Sign In',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
+      )
+
+      if (!popup) {
+        // Popup blocked, fallback to full page redirect
+        await signIn("google", { callbackUrl: "/dashboard" })
+        return
+      }
+
+      // Poll for popup closure or successful auth
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup)
+          setIsGoogleLoading(false)
+          
+          // Check if user is now authenticated by refreshing the page
+          // The popup would have completed auth and set the session
+          window.location.reload()
+        }
+      }, 500)
+
+      // Set timeout to prevent infinite polling
+      setTimeout(() => {
+        clearInterval(checkPopup)
+        if (!popup.closed) {
+          popup.close()
+        }
+        setIsGoogleLoading(false)
+      }, 120000) // 2 minutes timeout
+
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to sign in with Google. Please try again.",
         variant: "destructive",
       })
-    } finally {
       setIsGoogleLoading(false)
     }
   }
