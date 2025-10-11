@@ -436,16 +436,15 @@ export default function AdminSettingsPage() {
           <TabsContent value="oauth" className="space-y-4">
             {['shopify', 'etsy', 'bigcommerce', 'tiktok'].map((platform) => {
               const isEtsy = platform === 'etsy'
-              const clientIdLabel = isEtsy ? 'Keystring' : 'Client ID'
-              const clientSecretLabel = isEtsy ? 'Shared Secret' : 'Client Secret'
-              const clientIdPlaceholder = isEtsy ? 'Your Etsy Keystring' : 'OAuth Client ID'
+              const clientIdLabel = isEtsy ? 'Keystring (API Key)' : 'Client ID'
+              const clientIdPlaceholder = isEtsy ? 'Your Etsy API Key' : 'OAuth Client ID'
               
               return (
                 <Card key={platform}>
                   <CardHeader>
                     <CardTitle className="capitalize">{platform} OAuth</CardTitle>
                     <CardDescription>
-                      {isEtsy ? 'Etsy API v3 credentials' : `OAuth credentials for ${platform} integration`}
+                      {isEtsy ? 'Etsy API v3 uses PKCE (no client secret needed)' : `OAuth credentials for ${platform} integration`}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -458,33 +457,39 @@ export default function AdminSettingsPage() {
                         placeholder={clientIdPlaceholder}
                         className="font-mono"
                       />
-                      {isEtsy && (
-                        <p className="text-xs text-gray-500">
-                          From Etsy Developer Portal → Apps → Your App
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500">
+                        {isEtsy
+                          ? 'From Etsy Developer Portal → Apps → Your App → "Keystring"'
+                          : 'OAuth client identifier from provider'
+                        }
+                      </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor={`${platform}_client_secret`}>{clientSecretLabel}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id={`${platform}_client_secret`}
-                          type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
-                          value={getSetting(`${platform}_client_secret`)}
-                          onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
-                          placeholder="..."
-                          className="font-mono"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => toggleShowSecret(`${platform}_client_secret`)}
-                        >
-                          {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
+                    {!isEtsy && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`${platform}_client_secret`}>Client Secret</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id={`${platform}_client_secret`}
+                            type={showSecrets[`${platform}_client_secret`] ? 'text' : 'password'}
+                            value={getSetting(`${platform}_client_secret`)}
+                            onChange={(e) => updateSetting(`${platform}_client_secret`, e.target.value)}
+                            placeholder="..."
+                            className="font-mono"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleShowSecret(`${platform}_client_secret`)}
+                          >
+                            {showSecrets[`${platform}_client_secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          OAuth client secret (encrypted in database)
+                        </p>
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
@@ -493,11 +498,22 @@ export default function AdminSettingsPage() {
                         value={getSetting(`${platform}_redirect_uri`)}
                         onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
                         placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
+                        className="font-mono text-sm"
                       />
                       <p className="text-xs text-gray-500">
-                        Copy this URL to your {platform} app configuration
+                        {isEtsy
+                          ? 'Must match EXACTLY in Etsy Developer Portal (no trailing slash)'
+                          : `Register this URL in your ${platform} app configuration`
+                        }
                       </p>
                     </div>
+                    
+                    {isEtsy && (
+                      <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-900">
+                        <p className="font-semibold mb-1">✓ Etsy uses PKCE for security</p>
+                        <p className="text-xs">Etsy doesn't require a client secret. We automatically generate code_challenge and code_verifier for each OAuth request.</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )
