@@ -96,53 +96,82 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen">
       {/* Navigation */}
       <HomepageNav onSignInClick={() => setShowAuthModal(true)} />
       
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16 md:py-24">
-        <div className="text-center max-w-4xl mx-auto space-y-8">
-          <Badge variant="secondary" className="text-sm px-4 py-1">
-            🚀 The Future of Marketplace Management
-          </Badge>
-          
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            Manage All Your
-            <span className="text-primary"> Marketplace Listings</span>
-            <br />
-            From One Place
-          </h1>
-          
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            TEKMS Listing Manager simplifies multi-platform e-commerce. 
-            Sync products across BigCommerce, Shopify, Etsy, and TikTok with ease.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
-              className="text-lg px-8"
-              onClick={() => setShowAuthModal(true)}
-            >
-              Get Started Free
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              className="text-lg px-8"
-              onClick={() => {
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
-              }}
-            >
-              Learn More
-            </Button>
+      {/* Hero Section with Gradient */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-purple-400 via-purple-500 to-pink-400">
+        {/* Animated gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-300/30 via-transparent to-pink-300/30 animate-pulse"></div>
+        
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000,transparent)]"></div>
+        
+        <div className="relative container mx-auto px-4 py-20 md:py-32 lg:py-40">
+          <div className="text-center max-w-5xl mx-auto space-y-8">
+            <Badge variant="secondary" className="text-sm px-4 py-2 bg-white/90 text-purple-700 hover:bg-white border-0">
+              🚀 The Future of Marketplace Management
+            </Badge>
+            
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-white leading-tight">
+              Manage All Your
+              <br />
+              <span className="bg-gradient-to-r from-yellow-200 via-pink-200 to-cyan-200 bg-clip-text text-transparent">
+                Marketplace Listings
+              </span>
+              <br />
+              From One Place
+            </h1>
+            
+            <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-medium">
+              Sync products across BigCommerce, Shopify, Etsy, and TikTok with ease.
+              Powerful automation meets simple management.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
+              <Button
+                size="lg"
+                className="text-lg px-10 py-7 bg-white text-purple-700 hover:bg-gray-100 font-bold shadow-2xl hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
+                onClick={() => setShowAuthModal(true)}
+              >
+                Get Started Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-10 py-7 border-2 border-white bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm font-semibold shadow-lg"
+                onClick={() => {
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+              >
+                Learn More
+              </Button>
+            </div>
+            
+            <div className="flex items-center justify-center gap-8 pt-6 text-white/80 text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                <span>10 free products</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                <span>Cancel anytime</span>
+              </div>
+            </div>
           </div>
-          
-          <p className="text-sm text-muted-foreground">
-            No credit card required • 10 free products • Cancel anytime
-          </p>
+        </div>
+        
+        {/* Bottom wave separator */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
+            <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="currentColor" className="text-background"/>
+          </svg>
         </div>
       </div>
 
