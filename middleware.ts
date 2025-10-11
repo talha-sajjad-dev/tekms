@@ -3,7 +3,6 @@ import type { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 
 export async function middleware(request: NextRequest) {
-  const session = await auth()
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
@@ -24,10 +23,14 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isNextInternal = pathname.startsWith("/_next") || pathname.startsWith("/api/auth/")
 
-  // Allow public routes and Next.js internal routes
+  // Allow public routes and Next.js internal routes WITHOUT checking session
+  // This is critical because auth() uses Prisma which doesn't work in edge middleware
   if (isPublicRoute || isNextInternal) {
     return NextResponse.next()
   }
+
+  // Only call auth() for protected routes
+  const session = await auth()
 
   // Require authentication for all other routes
   if (!session?.user) {
