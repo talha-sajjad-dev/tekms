@@ -248,8 +248,19 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t mt-16">
         <div className="container mx-auto px-4 py-8">
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <p>© 2024 TEKMS Listing Manager. All rights reserved.</p>
+            <div className="flex gap-6">
+              <a href="/privacy" className="hover:text-primary transition-colors">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="hover:text-primary transition-colors">
+                Terms of Service
+              </a>
+              <a href="mailto:support@tekmslisting.com" className="hover:text-primary transition-colors">
+                Contact
+              </a>
+            </div>
           </div>
         </div>
       </footer>

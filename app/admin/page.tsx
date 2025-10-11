@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Users, 
-  Settings as SettingsIcon, 
-  DollarSign, 
+import { SettingsEditor } from "@/components/admin/settings-editor"
+import { UserManagement } from "@/components/admin/user-management"
+import {
+  Users,
+  Settings as SettingsIcon,
+  DollarSign,
   Package,
   ArrowLeft,
   Shield,
@@ -209,17 +211,7 @@ export default function AdminPage() {
 
           {/* Users Tab */}
           <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>View and manage all users</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  User management interface coming soon...
-                </p>
-              </CardContent>
-            </Card>
+            <UserManagement />
           </TabsContent>
 
           {/* Pricing Tab */}
@@ -245,9 +237,7 @@ export default function AdminPage() {
                 <CardDescription>Configure integrations and system parameters</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  Settings interface coming soon...
-                </p>
+                <SettingsEditor />
               </CardContent>
             </Card>
           </TabsContent>
