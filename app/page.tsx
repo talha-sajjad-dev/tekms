@@ -54,26 +54,29 @@ export default function HomePage() {
 
   const plans = [
     {
-      name: "Free",
+      name: "Free Forever",
       price: "$0",
-      description: "Perfect for getting started",
+      description: "Perfect for testing",
       features: [
-        "10 products",
-        "BigCommerce & Shopify access",
+        "1 store connection",
+        "Up to 10 products",
+        "All marketplace platforms",
         "Basic sync features",
-        "Community support"
+        "Community support",
+        "No credit card required"
       ],
       popular: false
     },
     {
-      name: "Professional",
-      price: "$29",
-      description: "For growing businesses",
+      name: "Pay Per Store",
+      price: "$10-50",
+      description: "Scales with your business",
       features: [
-        "Unlimited products",
-        "All marketplace access",
-        "Etsy & TikTok integration",
-        "Bulk operations",
+        "Unlimited store connections",
+        "Each store billed separately",
+        "Auto-tier based on products",
+        "All marketplace integrations",
+        "Etsy & TikTok Shop access",
         "Priority support",
         "Advanced analytics"
       ],
@@ -81,15 +84,15 @@ export default function HomePage() {
     },
     {
       name: "Enterprise",
-      price: "$99",
-      description: "For large-scale operations",
+      price: "Custom",
+      description: "For large operations",
       features: [
-        "Everything in Professional",
-        "API access",
-        "Scheduled syncs",
+        "Everything in Pay Per Store",
+        "Dedicated account manager",
         "Custom integrations",
-        "Dedicated support",
-        "SLA guarantee"
+        "API access",
+        "SLA guarantee",
+        "Volume discounts"
       ],
       popular: false
     }
@@ -217,10 +220,13 @@ export default function HomePage() {
               Pricing
             </Badge>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-[#0F172A]">
-              Simple, <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Transparent</span> Pricing
+              Simple, <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Flexible</span> Pricing
             </h2>
-            <p className="text-xl text-[#64748B] max-w-3xl mx-auto">
-              Choose the perfect plan to scale your marketplace business
+            <p className="text-xl text-[#64748B] max-w-3xl mx-auto mb-4">
+              Connect unlimited stores. Pay per store based on product count.
+            </p>
+            <p className="text-base text-[#64748B] max-w-2xl mx-auto">
+              Each store automatically upgrades tiers as you add products: $10 (1-100), $20 (101-500), $30 (501-1K), $40 (1K-2.5K), $50 (2.5K+)
             </p>
           </div>
           
@@ -281,7 +287,7 @@ export default function HomePage() {
           </div>
           
           <p className="text-center mt-12 text-sm text-[#64748B]">
-            All plans include a 14-day free trial. No credit card required.
+            Start free with 10 products. Add stores and scale as you grow. No credit card required to start.
           </p>
         </div>
       </div>
