@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { encrypt } from '@/lib/encryption'
+import { getSetting } from '@/lib/settings'
 import crypto from 'crypto'
 
 /**
@@ -8,11 +9,13 @@ import crypto from 'crypto'
  * @param state - CSRF protection state token
  */
 export async function getShopifyAuthUrl(shop: string, state: string): Promise<string> {
-  const clientId = process.env.SHOPIFY_CLIENT_ID
+  const clientId = await getSetting('shopify_client_id', process.env.SHOPIFY_CLIENT_ID || '')
   
   if (!clientId) {
-    throw new Error('SHOPIFY_CLIENT_ID not configured')
+    throw new Error('Shopify Client ID not configured. Please configure in Admin > System Settings > OAuth.')
   }
+  
+  const redirectUri = await getSetting('shopify_redirect_uri', `${process.env.NEXTAUTH_URL}/api/auth/callback/shopify`)
   
   // Clean shop domain
   const cleanShop = shop.replace(/^https?:\/\//, '').replace(/\/$/, '')
@@ -20,9 +23,9 @@ export async function getShopifyAuthUrl(shop: string, state: string): Promise<st
   const params = new URLSearchParams({
     client_id: clientId,
     scope: 'read_products,write_products,read_inventory,write_inventory,read_orders',
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/shopify`,
+    redirect_uri: redirectUri,
     state: state,
-    grant_options: JSON.stringify({ access_mode: 'offline' }) // Get refresh token
+    grant_options: JSON.stringify({ access_mode: 'offline' })
   })
   
   return `https://${cleanShop}/admin/oauth/authorize?${params.toString()}`
@@ -39,8 +42,8 @@ export async function handleShopifyCallback(
   shop: string,
   userId: string
 ): Promise<{ success: boolean; storeName: string; storeId: string }> {
-  const clientId = process.env.SHOPIFY_CLIENT_ID
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET
+  const clientId = await getSetting('shopify_client_id', process.env.SHOPIFY_CLIENT_ID || '')
+  const clientSecret = await getSetting('shopify_client_secret', process.env.SHOPIFY_CLIENT_SECRET || '')
   
   if (!clientId || !clientSecret) {
     throw new Error('Shopify credentials not configured')
@@ -173,8 +176,8 @@ export function generateStateToken(): string {
 /**
  * Verify HMAC signature from Shopify (for webhook verification)
  */
-export function verifyShopifyHmac(query: Record<string, string>, hmac: string): boolean {
-  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET
+export async function verifyShopifyHmac(query: Record<string, string>, hmac: string): Promise<boolean> {
+  const clientSecret = await getSetting('shopify_client_secret', process.env.SHOPIFY_CLIENT_SECRET || '')
   if (!clientSecret) return false
   
   // Remove hmac and signature from query

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { encrypt } from '@/lib/encryption'
+import { getSetting } from '@/lib/settings'
 import crypto from 'crypto'
 
 /**
@@ -7,16 +8,18 @@ import crypto from 'crypto'
  * @param state - CSRF protection state token
  */
 export async function getTikTokAuthUrl(state: string): Promise<string> {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY
+  const clientKey = await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
   
   if (!clientKey) {
-    throw new Error('TIKTOK_CLIENT_KEY not configured')
+    throw new Error('TikTok Client ID not configured. Please configure in Admin > System Settings > OAuth.')
   }
+  
+  const redirectUri = (await getSetting('tiktok_redirect_uri', `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`)) || `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`
   
   const params = new URLSearchParams({
     app_key: clientKey,
     state: state,
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`,
+    redirect_uri: redirectUri,
   })
   
   return `https://services.tiktokshop.com/open/authorize?${params.toString()}`
@@ -31,8 +34,8 @@ export async function handleTikTokCallback(
   code: string,
   userId: string
 ): Promise<{ success: boolean; storeName: string; storeId: string }> {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET
+  const clientKey = await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
+  const clientSecret = await getSetting('tiktok_client_secret', process.env.TIKTOK_CLIENT_SECRET || '')
   
   if (!clientKey || !clientSecret) {
     throw new Error('TikTok credentials not configured')

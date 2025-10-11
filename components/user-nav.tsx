@@ -71,10 +71,6 @@ export function UserNav() {
           <LayoutDashboard className="mr-2 h-4 w-4" />
           <span>Dashboard</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/credentials")}>
-          <Key className="mr-2 h-4 w-4" />
-          <span>API Credentials</span>
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/billing")}>
           <CreditCard className="mr-2 h-4 w-4" />
           <span>Billing</span>
@@ -86,6 +82,10 @@ export function UserNav() {
         {isAdmin && (
           <>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/credentials")}>
+              <Key className="mr-2 h-4 w-4" />
+              <span>API Credentials</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/admin")}>
               <ShieldCheck className="mr-2 h-4 w-4" />
               <span>Admin Dashboard</span>
