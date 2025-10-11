@@ -1,42 +1,35 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SettingsEditor } from "@/components/admin/settings-editor"
-import { UserManagement } from "@/components/admin/user-management"
-import {
-  Users,
-  Settings as SettingsIcon,
-  DollarSign,
-  Package,
-  ArrowLeft,
+import { useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+  Settings, 
+  Users, 
+  DollarSign, 
   Shield,
-  Database
-} from "lucide-react"
+  ArrowLeft,
+  Store,
+  Package,
+  BarChart3
+} from 'lucide-react'
 
-export default function AdminPage() {
+export default function AdminDashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === "authenticated") {
-      // Check if user is admin
-      if (session?.user?.role !== "ADMIN") {
-        router.push("/dashboard")
-      } else {
-        setLoading(false)
-      }
-    } else if (status === "unauthenticated") {
-      router.push("/")
+    if (status === 'unauthenticated') {
+      router.push('/')
+    } else if (status === 'authenticated' && session?.user?.role !== 'ADMIN') {
+      router.push('/dashboard')
     }
   }, [status, session])
 
-  if (status === "loading" || loading) {
+  if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -44,204 +37,196 @@ export default function AdminPage() {
     )
   }
 
+  if (session?.user?.role !== 'ADMIN') {
+    return null
+  }
+
+  const adminCards = [
+    {
+      title: 'System Settings',
+      description: 'Configure API keys, OAuth, Stripe, Email, and AI integrations',
+      icon: Settings,
+      href: '/admin/settings',
+      color: 'from-blue-600 to-cyan-600',
+      badge: 'Essential'
+    },
+    {
+      title: 'Pricing Tiers',
+      description: 'Manage store pricing tiers and subscription plans',
+      icon: DollarSign,
+      href: '/admin/pricing',
+      color: 'from-green-600 to-emerald-600',
+      badge: 'Coming Soon'
+    },
+    {
+      title: 'User Management',
+      description: 'Manage users, permissions, and legacy feature access',
+      icon: Users,
+      href: '/admin/users',
+      color: 'from-purple-600 to-pink-600',
+      badge: 'Coming Soon'
+    },
+    {
+      title: 'Store Connections',
+      description: 'View all user store connections and subscriptions',
+      icon: Store,
+      href: '/admin/stores',
+      color: 'from-orange-600 to-red-600',
+      badge: 'Coming Soon'
+    },
+    {
+      title: 'Product Analytics',
+      description: 'View product statistics and import/export analytics',
+      icon: BarChart3,
+      href: '/admin/analytics',
+      color: 'from-indigo-600 to-blue-600',
+      badge: 'Coming Soon'
+    },
+    {
+      title: 'System Health',
+      description: 'Monitor system performance, errors, and API usage',
+      icon: Package,
+      href: '/admin/health',
+      color: 'from-gray-600 to-slate-600',
+      badge: 'Coming Soon'
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
-      <header className="border-b bg-gradient-to-r from-primary/10 to-primary/5">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold">Admin Panel</h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage users, settings, and system configuration
-                </p>
+      <header className="border-b bg-white/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-2">
+                <Shield className="h-8 w-8 text-orange-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                  <p className="text-sm text-gray-600">
+                    System management and configuration
+                  </p>
+                </div>
               </div>
             </div>
+            <Badge variant="outline" className="border-orange-200 text-orange-600">
+              Admin Only
+            </Badge>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing Plans</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Welcome Message */}
+        <Card className="mb-8 bg-gradient-to-r from-orange-600 to-red-600 border-0 text-white">
+          <CardContent className="pt-6">
+            <h2 className="text-2xl font-bold mb-2">Welcome, Administrator</h2>
+            <p className="text-orange-100">
+              You have full access to system configuration, user management, and analytics.
+            </p>
+          </CardContent>
+        </Card>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Total Users</CardDescription>
-                  <CardTitle className="text-3xl flex items-center gap-2">
-                    <Users className="h-6 w-6 text-primary" />
-                    <span>0</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Active accounts
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Total Products</CardDescription>
-                  <CardTitle className="text-3xl flex items-center gap-2">
-                    <Package className="h-6 w-6 text-primary" />
-                    <span>0</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Across all users
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Revenue (MRR)</CardDescription>
-                  <CardTitle className="text-3xl flex items-center gap-2">
-                    <DollarSign className="h-6 w-6 text-primary" />
-                    <span>$0</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Monthly recurring
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Database</CardDescription>
-                  <CardTitle className="text-3xl flex items-center gap-2">
-                    <Database className="h-6 w-6 text-primary" />
-                    <span>OK</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    System healthy
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common administrative tasks</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start"
-                    onClick={() => {
-                      const tab = document.querySelector('[value="users"]') as HTMLElement
-                      tab?.click()
-                    }}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Manage Users
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start"
-                    onClick={() => {
-                      const tab = document.querySelector('[value="pricing"]') as HTMLElement
-                      tab?.click()
-                    }}
-                  >
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Edit Pricing Plans
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start"
-                    onClick={() => {
-                      const tab = document.querySelector('[value="settings"]') as HTMLElement
-                      tab?.click()
-                    }}
-                  >
-                    <SettingsIcon className="h-4 w-4 mr-2" />
-                    System Settings
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Status</CardTitle>
-                  <CardDescription>Current system information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Database</span>
-                    <span className="text-sm font-medium text-green-600">Connected</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Stripe Integration</span>
-                    <span className="text-sm font-medium text-yellow-600">Pending Setup</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Email Service</span>
-                    <span className="text-sm font-medium text-yellow-600">Pending Setup</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Search Engine</span>
-                    <span className="text-sm font-medium text-yellow-600">Pending Setup</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Users Tab */}
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-
-          {/* Pricing Tab */}
-          <TabsContent value="pricing">
-            <Card>
+        {/* Admin Tools Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {adminCards.map((card, index) => (
+            <Card 
+              key={index}
+              className="hover:shadow-lg transition-all cursor-pointer border-blue-100 bg-white/80 backdrop-blur-sm group"
+              onClick={() => {
+                if (!card.badge || card.badge === 'Essential') {
+                  router.push(card.href)
+                }
+              }}
+            >
               <CardHeader>
-                <CardTitle>Pricing Plans</CardTitle>
-                <CardDescription>Manage subscription tiers and features</CardDescription>
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 rounded-lg bg-gradient-to-r ${card.color} group-hover:scale-110 transition-transform`}>
+                    <card.icon className="h-6 w-6 text-white" />
+                  </div>
+                  {card.badge && (
+                    <Badge 
+                      variant={card.badge === 'Essential' ? 'default' : 'outline'}
+                      className={
+                        card.badge === 'Essential' 
+                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600'
+                          : 'border-gray-300'
+                      }
+                    >
+                      {card.badge}
+                    </Badge>
+                  )}
+                </div>
+                <CardTitle className="text-lg">{card.title}</CardTitle>
+                <CardDescription className="text-sm">
+                  {card.description}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  Pricing plan editor coming soon...
-                </p>
-              </CardContent>
             </Card>
-          </TabsContent>
+          ))}
+        </div>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>Configure integrations and system parameters</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SettingsEditor />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        {/* Quick Stats */}
+        <div className="mt-8 grid md:grid-cols-4 gap-4">
+          <Card className="border-blue-100 bg-white/80">
+            <CardHeader className="pb-2">
+              <CardDescription>Total Users</CardDescription>
+              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-gray-600">Active users</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-100 bg-white/80">
+            <CardHeader className="pb-2">
+              <CardDescription>Connected Stores</CardDescription>
+              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-gray-600">OAuth connections</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-100 bg-white/80">
+            <CardHeader className="pb-2">
+              <CardDescription>Total Products</CardDescription>
+              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-gray-600">Across all stores</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-100 bg-white/80">
+            <CardHeader className="pb-2">
+              <CardDescription>Monthly Revenue</CardDescription>
+              <CardTitle className="text-3xl text-blue-600">$0</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-gray-600">Subscription income</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Important Notes */}
+        <Card className="mt-8 border-orange-200 bg-orange-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-900">
+              <Shield className="h-5 w-5" />
+              Important Admin Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-orange-800">
+            <p>• Configure System Settings first to enable OAuth store connections</p>
+            <p>• All API keys and secrets are encrypted in the database (AES-256-GCM)</p>
+            <p>• Changes take effect immediately without server restart</p>
+            <p>• Users can only connect stores after OAuth credentials are configured</p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

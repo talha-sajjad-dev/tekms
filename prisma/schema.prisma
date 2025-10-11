@@ -23,14 +23,19 @@ model User {
   image         String?
   role          UserRole  @default(USER)
   
+  // Legacy feature permissions (admin can grant)
+  allowLegacyEtsyImport   Boolean @default(false)
+  allowLegacyTikTokExport Boolean @default(false)
+  
   // Relations
-  accounts      Account[]
-  sessions      Session[]
-  subscription  Subscription?
-  credentials   UserCredential[]
-  usageRecords  UsageRecord[]
-  products      Product[]
-  syncJobs      SyncJob[]
+  accounts         Account[]
+  sessions         Session[]
+  subscription     Subscription?
+  credentials      UserCredential[]
+  storeConnections StoreConnection[]
+  usageRecords     UsageRecord[]
+  products         Product[]
+  syncJobs         SyncJob[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -111,10 +116,9 @@ model Subscription {
 }
 
 enum SubscriptionTier {
-  FREE
-  STARTER
-  PROFESSIONAL
-  ENTERPRISE
+  FREE        // 1 store, 10 products total
+  PAID        // Unlimited stores, per-store billing
+  ENTERPRISE  // Custom pricing
 }
 
 enum SubscriptionStatus {
@@ -183,6 +187,7 @@ model UserCredential {
   encryptedKey String   @db.Text // AES-256-GCM encrypted
   label        String?
   isActive     Boolean  @default(true)
+  isLegacy     Boolean  @default(true) // Mark as legacy credential
   
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
@@ -201,6 +206,119 @@ enum Platform {
 }
 
 // ============================================
+// STORE CONNECTIONS (OAuth)
+// ============================================
+
+model StoreConnection {
+  id                String   @id @default(cuid())
+  userId            String
+  platform          Platform
+  
+  // Store Info
+  storeName         String
+  storeUrl          String?
+  externalStoreId   String   // Platform's unique store ID
+  
+  // OAuth Tokens (encrypted with AES-256-GCM)
+  accessToken       String   @db.Text
+  refreshToken      String?  @db.Text
+  tokenExpiresAt    DateTime?
+  
+  // Scopes granted
+  scopes            String[]
+  
+  // Status
+  isActive          Boolean  @default(true)
+  lastSyncedAt      DateTime?
+  syncStatus        String?  // "connected", "error", "needs_reauth"
+  syncError         String?
+  
+  // Product tracking
+  productCount      Int      @default(0) // Cached count for billing
+  
+  // Platform-specific metadata
+  metadata          Json?
+  
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products           Product[]
+  storeSubscription  StoreSubscription?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, platform, externalStoreId])
+  @@index([userId, platform])
+  @@index([userId, isActive])
+}
+
+// ============================================
+// PER-STORE SUBSCRIPTION & BILLING
+// ============================================
+
+model StoreSubscription {
+  id                     String   @id @default(cuid())
+  storeConnectionId      String   @unique
+  userId                 String   // Denormalized for easy queries
+  
+  // Stripe details
+  stripeSubscriptionId   String?  @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Current pricing tier for this store
+  pricingTierId          String
+  productCount           Int      @default(0)
+  
+  // Status
+  status                 SubscriptionStatus @default(ACTIVE)
+  cancelAtPeriodEnd      Boolean  @default(false)
+  
+  // Relations
+  storeConnection StoreConnection  @relation(fields: [storeConnectionId], references: [id], onDelete: Cascade)
+  pricingTier     StorePricingTier @relation(fields: [pricingTierId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([storeConnectionId])
+  @@index([stripeSubscriptionId])
+}
+
+// Admin-Manageable Store Pricing Tiers
+model StorePricingTier {
+  id              String   @id @default(cuid())
+  name            String   // "Starter", "Growth", "Pro", etc.
+  
+  // Product range
+  minProducts     Int      // e.g., 10
+  maxProducts     Int      // e.g., 100 (-1 for unlimited)
+  
+  // Pricing
+  monthlyPrice    Decimal  @db.Decimal(10, 2)
+  yearlyPrice     Decimal? @db.Decimal(10, 2)
+  stripePriceId   String?  // Stripe monthly price ID
+  stripeYearlyPriceId String?
+  
+  // Features
+  features        Json     // Array of feature strings
+  
+  // Display
+  isActive        Boolean  @default(true)
+  displayOrder    Int      @default(0)
+  description     String?
+  
+  // Relations
+  storeSubscriptions StoreSubscription[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([isActive, displayOrder])
+  @@index([minProducts, maxProducts])
+}
+
+// ============================================
 // PRODUCTS & SYNC
 // ============================================
 
@@ -209,6 +327,10 @@ model Product {
   userId           String
   platform         Platform
   externalId       String
+  
+  // Connection source (nullable for legacy imports)
+  storeConnectionId String?
+  importMethod      String   @default("oauth") // "oauth" or "legacy"
   
   // Core fields
   name             String
@@ -226,20 +348,24 @@ model Product {
   images           Json?
   variants         Json?
   customFields     Json?
+  platformData     Json?    // Store original platform data
   
   // Sync status
   lastSyncedAt     DateTime?
   syncStatus       String?
   syncError        String?
   
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeConnection StoreConnection? @relation(fields: [storeConnectionId], references: [id])
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  @@unique([userId, platform, externalId])
+  @@unique([userId, platform, externalId, importMethod])
   @@index([userId, platform])
   @@index([userId, createdAt])
+  @@index([storeConnectionId])
+  @@index([importMethod])
 }
 
 model SyncJob {
