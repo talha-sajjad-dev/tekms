@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,10 +12,10 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { 
-  Download, 
-  ExternalLink, 
-  RefreshCw, 
+import {
+  Download,
+  ExternalLink,
+  RefreshCw,
   Search,
   CheckCircle2,
   Package,
@@ -23,7 +25,9 @@ import {
   DollarSign,
   Eye,
   EyeOff,
-  Settings
+  Settings,
+  Lock,
+  TrendingUp
 } from "lucide-react"
 
 interface Category {
@@ -83,6 +87,11 @@ const DEFAULT_FEATURE_IMAGES = [
 ]
 
 export default function EtsyImportPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [userTier, setUserTier] = useState<string>("")
+  
   const [etsyUrl, setEtsyUrl] = useState("")
   const [categories, setCategories] = useState<Category[]>([])
   const [sharedModifiers, setSharedModifiers] = useState<SharedModifier[]>([])
@@ -125,8 +134,41 @@ export default function EtsyImportPage() {
   const [maxTags, setMaxTags] = useState(20)
 
   useEffect(() => {
-    loadCategoriesAndModifiers()
-  }, [])
+    if (status === "unauthenticated") {
+      router.push("/")
+    } else if (status === "authenticated") {
+      checkAccess()
+    }
+  }, [status])
+
+  useEffect(() => {
+    if (hasAccess) {
+      loadCategoriesAndModifiers()
+    }
+  }, [hasAccess])
+
+  const checkAccess = async () => {
+    try {
+      const res = await fetch("/api/usage")
+      if (res.ok) {
+        const data = await res.json()
+        setUserTier(data.tier)
+        // Etsy is PRO+ only
+        const allowed = data.features.etsy === true
+        setHasAccess(allowed)
+        
+        if (!allowed) {
+          toast({
+            title: "Upgrade Required",
+            description: "Etsy import is available on Professional and Enterprise plans only",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Access check failed:", error)
+    }
+  }
 
   const loadCategoriesAndModifiers = async () => {
     setLoading(true)
@@ -318,13 +360,78 @@ export default function EtsyImportPage() {
     )
   }
 
+  if (status === "loading" || hasAccess === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="container mx-auto py-10">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-primary">
+            <CardHeader className="text-center">
+              <Lock className="h-16 w-16 mx-auto mb-4 text-primary" />
+              <CardTitle className="text-2xl">Upgrade Required</CardTitle>
+              <CardDescription>
+                Etsy import is available on Professional and Enterprise plans
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <TrendingUp className="h-4 w-4" />
+                <AlertTitle>Your current plan: {userTier}</AlertTitle>
+                <AlertDescription>
+                  Upgrade to Professional or Enterprise to unlock Etsy product import functionality
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">What you'll get with Professional:</h3>
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  <li>✓ Unlimited products</li>
+                  <li>✓ Etsy product import</li>
+                  <li>✓ TikTok product export</li>
+                  <li>✓ Bulk operations</li>
+                  <li>✓ Advanced analytics</li>
+                  <li>✓ Priority support</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <Button className="flex-1" onClick={() => router.push("/billing")}>
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  View Plans & Upgrade
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
+                  Back to Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto py-10">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Etsy to BigCommerce Import</h1>
-        <p className="text-muted-foreground mb-8">
-          Import Etsy listings into BigCommerce with full SEO optimization
-        </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Etsy to BigCommerce Import</h1>
+            <p className="text-muted-foreground">
+              Import Etsy listings into BigCommerce with full SEO optimization
+            </p>
+          </div>
+          <Badge variant="default" className="text-sm px-3 py-1">
+            <Lock className="h-3 w-3 mr-1" />
+            Professional Feature
+          </Badge>
+        </div>
 
         {/* Step 1: Etsy URL Input */}
         <Card className="mb-8">

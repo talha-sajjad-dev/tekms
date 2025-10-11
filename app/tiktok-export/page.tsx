@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +20,9 @@ import {
   Info,
   CheckCircle2,
   AlertCircle,
-  Package
+  Package,
+  Lock,
+  TrendingUp
 } from "lucide-react"
 
 interface TikTokProduct {
@@ -54,6 +58,11 @@ interface Template {
 }
 
 export default function TikTokExportPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [userTier, setUserTier] = useState<string>("")
+  
   const [products, setProducts] = useState<TikTokProduct[]>([])
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([])
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
@@ -67,12 +76,47 @@ export default function TikTokExportPage() {
   const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    loadTemplate()
-  }, [])
+    if (status === "unauthenticated") {
+      router.push("/")
+    } else if (status === "authenticated") {
+      checkAccess()
+    }
+  }, [status])
 
   useEffect(() => {
-    loadProducts()
-  }, [currentPage, searchTerm, itemsPerPage])
+    if (hasAccess) {
+      loadTemplate()
+    }
+  }, [hasAccess])
+
+  useEffect(() => {
+    if (hasAccess) {
+      loadProducts()
+    }
+  }, [currentPage, searchTerm, itemsPerPage, hasAccess])
+
+  const checkAccess = async () => {
+    try {
+      const res = await fetch("/api/usage")
+      if (res.ok) {
+        const data = await res.json()
+        setUserTier(data.tier)
+        // TikTok is PRO+ only
+        const allowed = data.features.tiktok === true
+        setHasAccess(allowed)
+        
+        if (!allowed) {
+          toast({
+            title: "Upgrade Required",
+            description: "TikTok export is available on Professional and Enterprise plans only",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Access check failed:", error)
+    }
+  }
 
   // Group products by base SKU whenever products change
   useEffect(() => {
@@ -301,13 +345,78 @@ export default function TikTokExportPage() {
     }, 0)
   }, [selectedGroups, productGroups])
 
+  if (status === "loading" || hasAccess === null) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="container mx-auto py-10">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-primary">
+            <CardHeader className="text-center">
+              <Lock className="h-16 w-16 mx-auto mb-4 text-primary" />
+              <CardTitle className="text-2xl">Upgrade Required</CardTitle>
+              <CardDescription>
+                TikTok export is available on Professional and Enterprise plans
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <TrendingUp className="h-4 w-4" />
+                <AlertTitle>Your current plan: {userTier}</AlertTitle>
+                <AlertDescription>
+                  Upgrade to Professional or Enterprise to unlock TikTok product export functionality
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold">What you'll get with Professional:</h3>
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  <li>✓ Unlimited products</li>
+                  <li>✓ Etsy product import</li>
+                  <li>✓ TikTok product export</li>
+                  <li>✓ Bulk operations</li>
+                  <li>✓ Advanced analytics</li>
+                  <li>✓ Priority support</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <Button className="flex-1" onClick={() => router.push("/billing")}>
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  View Plans & Upgrade
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
+                  Back to Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto py-10">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">TikTok Product Export</h1>
-        <p className="text-muted-foreground mb-8">
-          Export your BigCommerce products using your pre-configured TikTok template. Select specific products or export all. Each product selection includes all its variants (sizes, colors, etc.).
-        </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">TikTok Product Export</h1>
+            <p className="text-muted-foreground">
+              Export your BigCommerce products using your pre-configured TikTok template. Select specific products or export all. Each product selection includes all its variants (sizes, colors, etc.).
+            </p>
+          </div>
+          <Badge variant="default" className="text-sm px-3 py-1">
+            <Lock className="h-3 w-3 mr-1" />
+            Professional Feature
+          </Badge>
+        </div>
 
         {/* Template Info */}
         {template && (
