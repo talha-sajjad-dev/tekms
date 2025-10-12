@@ -15,7 +15,10 @@ export async function getShopifyAuthUrl(shop: string, state: string): Promise<st
     throw new Error('Shopify Client ID not configured. Please configure in Admin > System Settings > OAuth.')
   }
   
-  const redirectUri = (await getSetting('shopify_redirect_uri', `${process.env.NEXTAUTH_URL}/api/auth/callback/shopify`)) || `${process.env.NEXTAUTH_URL}/api/auth/callback/shopify`
+  // Auto-detect environment: localhost or production
+  // Always use NEXTAUTH_URL from environment for consistency
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const redirectUri = `${baseUrl}/api/auth/callback/shopify`
   
   // Clean shop domain
   const cleanShop = shop.replace(/^https?:\/\//, '').replace(/\/$/, '')

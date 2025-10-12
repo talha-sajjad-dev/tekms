@@ -600,36 +600,53 @@ export default function AdminSettingsPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id={`${platform}_redirect_uri`}
-                              value={getSetting(`${platform}_redirect_uri`)}
-                              onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
-                              placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
-                              className="font-mono text-sm"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const uri = getSetting(`${platform}_redirect_uri`) || `${window.location.origin}/api/auth/callback/${platform}`
-                                navigator.clipboard.writeText(uri)
-                                toast({
-                                  title: "Copied!",
-                                  description: "Redirect URI copied to clipboard"
-                                })
-                              }}
-                            >
-                              Copy
-                            </Button>
+                          <Label>Redirect URIs (Auto-Configured)</Label>
+                          <div className="rounded-md bg-blue-50 border border-blue-200 p-4 space-y-3">
+                            <div>
+                              <p className="text-xs font-semibold text-blue-900 mb-2">
+                                <CheckCircle2 className="h-3 w-3 inline mr-1" />
+                                Register BOTH URLs in {platform === 'shopify' ? 'Shopify Partners' : platform.charAt(0).toUpperCase() + platform.slice(1)}:
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 bg-white rounded p-2">
+                                  <code className="text-xs flex-1 font-mono">
+                                    http://localhost:3000/api/auth/callback/{platform}
+                                  </code>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(`http://localhost:3000/api/auth/callback/${platform}`)
+                                      toast({ title: "Copied localhost URL!" })
+                                    }}
+                                  >
+                                    Copy
+                                  </Button>
+                                </div>
+                                <div className="flex items-center gap-2 bg-white rounded p-2">
+                                  <code className="text-xs flex-1 font-mono">
+                                    {window.location.origin}/api/auth/callback/{platform}
+                                  </code>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(`${window.location.origin}/api/auth/callback/${platform}`)
+                                      toast({ title: "Copied production URL!" })
+                                    }}
+                                  >
+                                    Copy
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-xs text-blue-800">
+                              <strong>Auto-Detection:</strong> System automatically uses NEXTAUTH_URL environment variable.
+                              No manual configuration needed - works in both localhost and production!
+                            </p>
                           </div>
-                          <p className="text-xs text-gray-500">
-                            <strong>Register this exact URL</strong> in your {platform === 'shopify' ? 'Shopify Partners' : platform === 'tiktok' ? 'TikTok Developer' : platform} app → Allowed redirect URI(s)
-                          </p>
-                          <p className="text-xs text-blue-600">
-                            Example: {window.location.origin}/api/auth/callback/{platform}
-                          </p>
                         </div>
                       </>
                     )}
