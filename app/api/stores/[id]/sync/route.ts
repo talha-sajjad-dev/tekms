@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
+import { rateLimitedFetch, logRateLimitStatus } from '@/lib/bigcommerce/rate-limiter'
 
 /**
  * Sync products from store
@@ -125,9 +126,14 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
     let page = 1
     let hasMorePages = true
     
-    // Fetch all products with pagination
+    console.log(`🔄 Starting BigCommerce product sync for store: ${store.storeName}`)
+    
+    // Fetch all products with pagination and rate limiting
     while (hasMorePages) {
-      const response = await fetch(
+      console.log(`📦 Fetching products page ${page}...`)
+      logRateLimitStatus()
+      
+      const response = await rateLimitedFetch(
         `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=250&page=${page}`,
         {
           headers: {
@@ -145,65 +151,78 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
       const data = await response.json()
       allProducts = [...allProducts, ...data.data]
       
+      console.log(`✓ Fetched ${data.data.length} products (Total: ${allProducts.length})`)
+      
       // Check if there are more pages
       hasMorePages = data.meta.pagination.current_page < data.meta.pagination.total_pages
       page++
     }
     
-    // Process and save products to database
-    let syncedCount = 0
+    console.log(`📊 Total products fetched: ${allProducts.length}`)
     
-    for (const bcProduct of allProducts) {
-      try {
-        // Check if product already exists
-        const existing = await db.product.findFirst({
-          where: {
+    // Process and save products to database in batches
+    let syncedCount = 0
+    const batchSize = 50 // Process 50 products at a time
+    
+    console.log(`💾 Saving products to database in batches of ${batchSize}...`)
+    
+    for (let i = 0; i < allProducts.length; i += batchSize) {
+      const batch = allProducts.slice(i, i + batchSize)
+      
+      for (const bcProduct of batch) {
+        try {
+          // Check if product already exists
+          const existing = await db.product.findFirst({
+            where: {
+              userId: store.userId,
+              platform: 'BIGCOMMERCE',
+              externalId: bcProduct.id.toString(),
+              storeConnectionId: store.id
+            }
+          })
+          
+          const productData = {
             userId: store.userId,
-            platform: 'BIGCOMMERCE',
+            platform: 'BIGCOMMERCE' as const,
             externalId: bcProduct.id.toString(),
-            storeConnectionId: store.id
+            storeConnectionId: store.id,
+            importMethod: 'oauth',
+            name: bcProduct.name,
+            description: bcProduct.description || null,
+            sku: bcProduct.sku || null,
+            price: bcProduct.price || 0,
+            compareAtPrice: bcProduct.retail_price || null,
+            categories: bcProduct.categories || [],
+            tags: [],
+            images: bcProduct.images ? { images: bcProduct.images } : undefined,
+            variants: bcProduct.variants ? { variants: bcProduct.variants } : undefined,
+            customFields: bcProduct.custom_fields ? { custom_fields: bcProduct.custom_fields } : undefined,
+            platformData: bcProduct,
+            lastSyncedAt: new Date(),
+            syncStatus: 'synced'
           }
-        })
-        
-        const productData = {
-          userId: store.userId,
-          platform: 'BIGCOMMERCE' as const,
-          externalId: bcProduct.id.toString(),
-          storeConnectionId: store.id,
-          importMethod: 'oauth',
-          name: bcProduct.name,
-          description: bcProduct.description || null,
-          sku: bcProduct.sku || null,
-          price: bcProduct.price || 0,
-          compareAtPrice: bcProduct.retail_price || null,
-          categories: bcProduct.categories || [],
-          tags: [],
-          images: bcProduct.images ? { images: bcProduct.images } : null,
-          variants: bcProduct.variants ? { variants: bcProduct.variants } : null,
-          customFields: bcProduct.custom_fields ? { custom_fields: bcProduct.custom_fields } : null,
-          platformData: bcProduct,
-          lastSyncedAt: new Date(),
-          syncStatus: 'synced'
+          
+          if (existing) {
+            // Update existing product
+            await db.product.update({
+              where: { id: existing.id },
+              data: productData
+            })
+          } else {
+            // Create new product
+            await db.product.create({
+              data: productData
+            })
+          }
+          
+          syncedCount++
+        } catch (productError) {
+          console.error(`❌ Failed to sync product ${bcProduct.id}:`, productError)
+          // Continue with next product
         }
-        
-        if (existing) {
-          // Update existing product
-          await db.product.update({
-            where: { id: existing.id },
-            data: productData
-          })
-        } else {
-          // Create new product
-          await db.product.create({
-            data: productData
-          })
-        }
-        
-        syncedCount++
-      } catch (productError) {
-        console.error(`Failed to sync product ${bcProduct.id}:`, productError)
-        // Continue with next product
       }
+      
+      console.log(`✓ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allProducts.length / batchSize)} (${syncedCount} products synced)`)
     }
     
     // Update store's product count
@@ -211,6 +230,9 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
       where: { id: store.id },
       data: { productCount: syncedCount }
     })
+    
+    console.log(`✅ Sync complete! ${syncedCount} products synced successfully`)
+    logRateLimitStatus()
     
     return syncedCount
   } catch (error) {

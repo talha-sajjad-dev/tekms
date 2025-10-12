@@ -262,8 +262,12 @@ export default function StoreDetailPage() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? "Syncing..." : "Sync Products"}
               </Button>
+              <Button variant="outline" onClick={() => router.push(`/stores/${storeId}/products`)}>
+                <Package className="h-4 w-4 mr-2" />
+                Manage Products
+              </Button>
               <Button variant="outline" onClick={() => router.push("/products")}>
-                View Products
+                View All Products
               </Button>
             </div>
           </CardContent>
