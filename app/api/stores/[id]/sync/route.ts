@@ -22,6 +22,8 @@ export async function POST(
       )
     }
     
+    const { background } = await req.json().catch(() => ({ background: false }))
+    
     const store = await db.storeConnection.findFirst({
       where: {
         id: params.id,
@@ -43,10 +45,70 @@ export async function POST(
       )
     }
     
-    // Decrypt access token
-    const accessToken = decrypt(store.accessToken)
+    // Check if there's already a sync job running
+    const existingJob = await db.syncJob.findFirst({
+      where: {
+        userId: session.user.id,
+        platform: store.platform,
+        status: 'processing'
+      }
+    })
     
-    // Platform-specific sync logic
+    if (existingJob) {
+      return NextResponse.json({
+        success: false,
+        error: 'A sync job is already running for this platform',
+        jobId: existingJob.id
+      }, { status: 409 })
+    }
+    
+    // Create sync job
+    const syncJob = await db.syncJob.create({
+      data: {
+        userId: session.user.id,
+        platform: store.platform,
+        action: 'product_sync',
+        status: 'processing',
+        startedAt: new Date()
+      }
+    })
+    
+    // For large syncs (background mode), start async and return immediately
+    if (background) {
+      // Start sync in background (non-blocking)
+      performSync(store, syncJob.id).catch(console.error)
+      
+      return NextResponse.json({
+        success: true,
+        background: true,
+        jobId: syncJob.id,
+        message: 'Sync started in background. Check sync job status for progress.'
+      })
+    }
+    
+    // For regular sync, wait for completion
+    const productCount = await performSync(store, syncJob.id)
+    
+    return NextResponse.json({
+      success: true,
+      productCount,
+      jobId: syncJob.id
+    })
+    
+  } catch (error) {
+    console.error('Store sync error:', error)
+    
+    return NextResponse.json(
+      { error: 'Failed to start sync', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Perform the actual sync operation
+async function performSync(store: any, jobId: string): Promise<number> {
+  try {
+    const accessToken = decrypt(store.accessToken)
     let productCount = 0
     
     switch (store.platform) {
@@ -63,13 +125,10 @@ export async function POST(
         productCount = await syncTikTokProducts(store, accessToken)
         break
       default:
-        return NextResponse.json(
-          { error: 'Unsupported platform' },
-          { status: 400 }
-        )
+        throw new Error('Unsupported platform')
     }
     
-    // Update last synced time
+    // Update store sync status
     await db.storeConnection.update({
       where: { id: store.id },
       data: {
@@ -79,31 +138,40 @@ export async function POST(
       }
     })
     
-    return NextResponse.json({
-      success: true,
-      productCount
+    // Update sync job as completed
+    await db.syncJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'completed',
+        processedItems: productCount,
+        completedAt: new Date()
+      }
     })
     
+    return productCount
   } catch (error) {
-    console.error('Store sync error:', error)
+    console.error('Sync error:', error)
     
-    // Update sync error
-    try {
-      await db.storeConnection.update({
-        where: { id: params.id },
-        data: {
-          syncStatus: 'error',
-          syncError: error instanceof Error ? error.message : 'Unknown error'
-        }
-      })
-    } catch (updateError) {
-      console.error('Failed to update sync error:', updateError)
-    }
+    // Update store with error
+    await db.storeConnection.update({
+      where: { id: store.id },
+      data: {
+        syncStatus: 'error',
+        syncError: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }).catch(console.error)
     
-    return NextResponse.json(
-      { error: 'Failed to sync store', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+    // Update sync job as failed
+    await db.syncJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'failed',
+        errorLog: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: new Date()
+      }
+    }).catch(console.error)
+    
+    throw error
   }
 }
 

@@ -83,18 +83,40 @@ export default function StoreDetailPage() {
 
   const handleSync = async () => {
     setSyncing(true)
+    
+    // Check if we should use background sync for large stores
+    const useBackground = store && store.productCount > 1000
+    
+    if (useBackground) {
+      toast({
+        title: "Large Store Detected",
+        description: `This store has ${store.productCount} products. Sync will run in the background to prevent timeouts.`,
+      })
+    }
+    
     try {
       const res = await fetch(`/api/stores/${storeId}/sync`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ background: useBackground }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        toast({
-          title: "Sync Complete",
-          description: `Successfully synced ${data.productCount} products`,
-        })
+        if (data.background) {
+          toast({
+            title: "Sync Started",
+            description: `Background sync job started. This may take several minutes for large catalogs. Job ID: ${data.jobId}`,
+          })
+        } else {
+          toast({
+            title: "Sync Complete",
+            description: `Successfully synced ${data.productCount} products`,
+          })
+        }
         fetchStore()
       } else {
         toast({
@@ -254,6 +276,18 @@ export default function StoreDetailPage() {
               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
                 <div className="font-semibold text-destructive mb-1">Sync Error</div>
                 <div className="text-sm text-destructive/80">{store.syncError}</div>
+              </div>
+            )}
+            
+            {store.productCount > 5000 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md dark:bg-yellow-950/20">
+                <div className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                  Large Product Catalog
+                </div>
+                <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                  This store has {store.productCount.toLocaleString()} products. Syncs will automatically run in the background to prevent timeouts.
+                  Product management pages use pagination for optimal performance.
+                </div>
               </div>
             )}
 

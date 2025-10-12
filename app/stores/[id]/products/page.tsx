@@ -61,6 +61,13 @@ interface Product {
   syncStatus: string | null
 }
 
+interface PaginationInfo {
+  currentPage: number
+  totalPages: number
+  totalProducts: number
+  pageSize: number
+}
+
 interface StoreInfo {
   id: string
   storeName: string
@@ -82,6 +89,13 @@ export default function StoreProductsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [priceFilter, setPriceFilter] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    currentPage: 1,
+    totalPages: 1,
+    totalProducts: 0,
+    pageSize: 50
+  })
   
   // Dialogs
   const [showBulkDelete, setShowBulkDelete] = useState(false)
@@ -119,12 +133,28 @@ export default function StoreProductsPage() {
     }
   }
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page: number = 1) => {
+    setLoading(true)
     try {
-      const res = await fetch(`/api/products?storeId=${storeId}`)
+      const res = await fetch(`/api/products?storeId=${storeId}&page=${page}&limit=${pagination.pageSize}`)
       const data = await res.json()
       if (res.ok) {
-        setProducts(data.products || [])
+        // Convert Decimal prices to numbers and validate
+        const validatedProducts = (data.products || []).map((p: any) => ({
+          ...p,
+          price: typeof p.price === 'number' ? p.price : parseFloat(p.price?.toString() || '0'),
+          compareAtPrice: p.compareAtPrice ?
+            (typeof p.compareAtPrice === 'number' ? p.compareAtPrice : parseFloat(p.compareAtPrice?.toString() || '0'))
+            : null
+        }))
+        
+        setProducts(validatedProducts)
+        setPagination({
+          currentPage: data.pagination?.currentPage || 1,
+          totalPages: data.pagination?.totalPages || 1,
+          totalProducts: data.pagination?.totalProducts || validatedProducts.length,
+          pageSize: data.pagination?.pageSize || 50
+        })
       } else {
         toast({
           title: "Error",
@@ -133,6 +163,7 @@ export default function StoreProductsPage() {
         })
       }
     } catch (error) {
+      console.error("Error fetching products:", error)
       toast({
         title: "Error",
         description: "Failed to fetch products",
@@ -244,10 +275,10 @@ export default function StoreProductsPage() {
             <div className="flex-1">
               <h1 className="text-2xl font-bold">Product Management</h1>
               <p className="text-sm text-muted-foreground">
-                {store?.storeName} - {filteredProducts.length} products
+                {store?.storeName} - Showing {filteredProducts.length} of {pagination.totalProducts} products
               </p>
             </div>
-            <Button onClick={fetchProducts}>
+            <Button onClick={() => fetchProducts(currentPage)}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -451,6 +482,46 @@ export default function StoreProductsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage - 1
+                      setCurrentPage(newPage)
+                      fetchProducts(newPage)
+                      setSelectedProducts(new Set())
+                    }}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newPage = currentPage + 1
+                      setCurrentPage(newPage)
+                      fetchProducts(newPage)
+                      setSelectedProducts(new Set())
+                    }}
+                    disabled={currentPage === pagination.totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {pagination.totalProducts} total products
+                </div>
               </div>
             )}
           </CardContent>

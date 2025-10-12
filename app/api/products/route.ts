@@ -91,13 +91,20 @@ export async function GET(req: NextRequest) {
       db.product.count({ where })
     ])
 
+    // Convert Decimal prices to numbers for JSON serialization
+    const serializedProducts = products.map(product => ({
+      ...product,
+      price: Number(product.price),
+      compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null
+    }))
+
     return NextResponse.json({
-      products,
+      products: serializedProducts,
       pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalProducts: total,
+        pageSize: limit
       }
     })
   } catch (error) {
