@@ -261,7 +261,35 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="stripe_webhook_secret">Webhook Secret</Label>
+                  <Label>Webhook Endpoint URL</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={`${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/webhooks/stripe`}
+                      readOnly
+                      className="font-mono text-sm bg-gray-50"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const webhookUrl = `${window.location.origin}/api/webhooks/stripe`
+                        navigator.clipboard.writeText(webhookUrl)
+                        toast({
+                          title: "Copied!",
+                          description: "Webhook URL copied to clipboard"
+                        })
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <p className="text-xs text-blue-600">
+                    <strong>Register this URL in Stripe:</strong> Dashboard → Developers → Webhooks → Add endpoint
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stripe_webhook_secret">Webhook Signing Secret</Label>
                   <div className="flex gap-2">
                     <Input
                       id="stripe_webhook_secret"
@@ -280,7 +308,19 @@ export default function AdminSettingsPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500">
-                    Webhook signing secret from Stripe dashboard
+                    After adding the webhook in Stripe, copy the signing secret here
+                  </p>
+                </div>
+
+                <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-xs text-blue-900">
+                    <strong>Setup Steps:</strong><br/>
+                    1. Copy the webhook URL above<br/>
+                    2. Go to Stripe Dashboard → Developers → Webhooks<br/>
+                    3. Click "Add endpoint" and paste the URL<br/>
+                    4. Select events: customer.subscription.*, invoice.*, checkout.session.completed<br/>
+                    5. Copy the webhook signing secret and paste it above<br/>
+                    6. Click "Save Stripe Settings"
                   </p>
                 </div>
 
