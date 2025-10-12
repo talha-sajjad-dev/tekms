@@ -1,4 +1,5 @@
 import type React from "react"
+import { Suspense } from "react"
 import "@/app/globals.css"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -25,7 +26,9 @@ export default function RootLayout({
       <body className={`${inter.className} flex flex-col min-h-screen`} suppressHydrationWarning>
         <Providers>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <LoadingBar />
+            <Suspense fallback={null}>
+              <LoadingBar />
+            </Suspense>
             <div className="flex-1">
               {children}
             </div>
