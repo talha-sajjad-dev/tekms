@@ -609,13 +609,16 @@ export default function AdminSettingsPage() {
                               </p>
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2 bg-white rounded p-2">
-                                  <code className="text-xs flex-1 font-mono">
-                                    http://localhost:3000/api/auth/callback/{platform}
-                                  </code>
+                                  <div className="flex-1">
+                                    <p className="text-[10px] text-gray-500 mb-0.5">For Local Development:</p>
+                                    <code className="text-xs font-mono">
+                                      http://localhost:3000/api/auth/callback/{platform}
+                                    </code>
+                                  </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-xs"
+                                    className="h-7 px-2 text-xs"
                                     onClick={() => {
                                       navigator.clipboard.writeText(`http://localhost:3000/api/auth/callback/${platform}`)
                                       toast({ title: "Copied localhost URL!" })
@@ -625,15 +628,18 @@ export default function AdminSettingsPage() {
                                   </Button>
                                 </div>
                                 <div className="flex items-center gap-2 bg-white rounded p-2">
-                                  <code className="text-xs flex-1 font-mono">
-                                    {window.location.origin}/api/auth/callback/{platform}
-                                  </code>
+                                  <div className="flex-1">
+                                    <p className="text-[10px] text-gray-500 mb-0.5">For Production (tekms.app):</p>
+                                    <code className="text-xs font-mono">
+                                      https://tekms.app/api/auth/callback/{platform}
+                                    </code>
+                                  </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-xs"
+                                    className="h-7 px-2 text-xs"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(`${window.location.origin}/api/auth/callback/${platform}`)
+                                      navigator.clipboard.writeText(`https://tekms.app/api/auth/callback/${platform}`)
                                       toast({ title: "Copied production URL!" })
                                     }}
                                   >
@@ -643,8 +649,8 @@ export default function AdminSettingsPage() {
                               </div>
                             </div>
                             <p className="text-xs text-blue-800">
-                              <strong>Auto-Detection:</strong> System automatically uses NEXTAUTH_URL environment variable.
-                              No manual configuration needed - works in both localhost and production!
+                              <strong>How it works:</strong> System automatically uses NEXTAUTH_URL from your .env file.
+                              Local dev uses localhost:3000, production uses tekms.app - no manual switching needed!
                             </p>
                           </div>
                         </div>
