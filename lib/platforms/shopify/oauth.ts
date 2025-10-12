@@ -20,9 +20,40 @@ export async function getShopifyAuthUrl(shop: string, state: string): Promise<st
   // Clean shop domain
   const cleanShop = shop.replace(/^https?:\/\//, '').replace(/\/$/, '')
   
+  // Comprehensive scopes for listing management
+  const scopes = [
+    // Product Management (Core)
+    'read_products',
+    'write_products',
+    
+    // Inventory Management
+    'read_inventory',
+    'write_inventory',
+    'read_locations',  // For multi-location inventory
+    
+    // Product Listings (Sales Channels)
+    'read_product_listings',
+    'write_product_listings',
+    
+    // Collections (Categories/Organization)
+    'read_collections',
+    'write_collections',
+    
+    // Pricing & Discounts
+    'read_price_rules',
+    'write_price_rules',
+    
+    // Orders (Track sales)
+    'read_orders',
+    
+    // Media (Product images/videos)
+    'read_files',
+    'write_files'
+  ].join(',')
+  
   const params = new URLSearchParams({
     client_id: clientId,
-    scope: 'read_products,write_products,read_inventory,write_inventory,read_orders',
+    scope: scopes,
     redirect_uri: redirectUri,
     state: state,
     grant_options: JSON.stringify({ access_mode: 'offline' })

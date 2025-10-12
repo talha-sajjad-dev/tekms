@@ -647,8 +647,8 @@ export default function StoresPageContent() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                 <p className="text-xs text-blue-900">
-                  <strong>Note:</strong> You'll be redirected to Shopify to authorize access to your store.
-                  Make sure Shopify OAuth credentials are configured in Admin → System Settings.
+                  <strong>What happens next?</strong> You'll be redirected to Shopify to securely authorize access to your store.
+                  We'll only access the products and inventory you give us permission to manage.
                 </p>
               </div>
             </CardContent>
