@@ -21,7 +21,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions) {
     }
 
     // Create transporter for Zoho Mail (or any SMTP)
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: config.smtp_host,
       port: config.smtp_port || 465,
       secure: config.smtp_port === 465, // true for 465, false for other ports

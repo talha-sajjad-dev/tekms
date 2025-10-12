@@ -1,346 +1,245 @@
-# TEKMS Listing Manager
+# TEKMS Listing Manager 🚀
 
-> **Complete Multi-Tenant SaaS Platform for Multi-Marketplace Product Management**
+A powerful multi-tenant SaaS platform for managing product listings across multiple e-commerce platforms including BigCommerce, Shopify, Etsy, and TikTok Shop.
 
-Manage your e-commerce listings across BigCommerce, Shopify, Etsy, and TikTok from a single, powerful platform.
+## 🌟 Features
 
-🌐 **Live Site**: [https://tekms.com](https://tekms.com)
+### Multi-Platform Integration
+- **BigCommerce** - Direct API integration
+- **Shopify** - OAuth-based store connections
+- **Etsy** - OAuth with PKCE security
+- **TikTok Shop** - OAuth integration
+- Seamless product sync across all platforms
 
----
+### User Features
+- 🔐 **Secure Authentication** - Email/password + Google OAuth
+- 🏪 **Multi-Store Management** - Connect unlimited stores
+- 📦 **Product Management** - Centralized dashboard for all products
+- 🔍 **Advanced Search** - Fast product search with filtering
+- 💰 **Per-Store Billing** - Automatic tier upgrades based on product count
+- 📊 **Analytics** - Track sync jobs and product statistics
 
-## ✨ Features
+### Admin Features
+- ⚙️ **System Settings** - Database-driven configuration (no code changes needed)
+- 👥 **User Management** - Manage roles and permissions
+- 💵 **Pricing Tiers** - Flexible per-store pricing management
+- 📄 **Page Management** - Edit footer pages and legal docs
+- 🔑 **API Credentials** - Secure credential storage with AES-256-GCM encryption
 
-### For Users
-- 🔐 **Secure Authentication** - Google OAuth + Email/Password
-- 📦 **Product Management** - Search, filter, and manage products across platforms
-- 🔑 **Credential Management** - Encrypted storage (AES-256-GCM) for marketplace API keys
-- 📊 **Real-Time Dashboard** - Usage stats, limits, and subscription tracking
-- 💳 **Subscription Management** - Flexible pricing tiers with instant upgrades
-- 🏪 **Multi-Platform Support** - BigCommerce, Shopify, Etsy, TikTok
-- 📥 **Etsy Import** - Import products with full SEO optimization (PRO+)
-- 📤 **TikTok Export** - Export to TikTok Shop format (PRO+)
+### Subscription Tiers
+- **Free** - 0-10 products ($0/month)
+- **Starter** - 11-100 products ($10/month)
+- **Growth** - 101-500 products ($25/month)
+- **Business** - 501-2,000 products ($50/month)
+- **Professional** - 2,001-10,000 products ($100/month)
+- **Advanced** - 10,001+ products ($200/month)
 
-### For Admins
-- 👥 **User Management** - View, edit, and manage all users
-- ⚙️ **Settings Editor** - Configure Stripe, email, and integrations from browser
-- 💰 **Subscription Control** - Override user subscriptions and permissions
-- 📈 **System Monitoring** - Real-time platform statistics
-- 🛡️ **Role Management** - Promote/demote admin access
+## 🛠️ Tech Stack
 
----
+- **Framework**: Next.js 15.2.4 (App Router)
+- **Language**: TypeScript
+- **Database**: PostgreSQL (DigitalOcean)
+- **ORM**: Prisma
+- **Authentication**: NextAuth.js v5
+- **Payments**: Stripe
+- **UI**: Tailwind CSS + shadcn/ui
+- **Email**: Nodemailer (SMTP)
+
+## 📋 Prerequisites
+
+- Node.js 18+ and npm
+- PostgreSQL database
+- Stripe account
+- Email service (SMTP)
+- Platform developer accounts (Shopify, Etsy, TikTok)
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 20.x
-- PostgreSQL database
-- Google OAuth credentials (for Google Sign-In)
-
-### Local Development
-
-1. **Clone repository**
+### 1. Clone Repository
 ```bash
-git clone https://github.com/gokhansancar82/tekms.git
-cd tekms
-git checkout gokhan
+git clone https://github.com/yourusername/tekms-listing-manager.git
+cd tekms-listing-manager
 ```
 
-2. **Install dependencies**
+### 2. Install Dependencies
 ```bash
-npm install --legacy-peer-deps
+npm install
 ```
 
-3. **Setup environment**
+### 3. Configure Environment
 ```bash
 cp .env.example .env
-# Edit .env with your credentials
 ```
 
-4. **Setup database**
+Edit `.env` with your credentials:
+```env
+DATABASE_URL="postgresql://user:pass@localhost:5432/tekms"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
+ENCRYPTION_KEY="generate-with-openssl-rand-hex-32"
+```
+
+### 4. Setup Database
 ```bash
-npx prisma generate
+# Run migrations
 npx prisma migrate dev
-npx prisma db seed
+
+# Seed pricing tiers
+npx tsx prisma/seed-pricing-tiers.ts
+
+# Seed footer pages
+npx tsx prisma/seed-pages.ts
 ```
 
-5. **Run development server**
+### 5. Start Development Server
 ```bash
 npm run dev
 ```
 
-Visit: http://localhost:3000
+Visit http://localhost:3000
 
----
+### 6. Create Admin User
 
-## 🏗️ Production Deployment (DigitalOcean)
-
-### Quick Deploy
-
+Register a user, then promote to admin:
 ```bash
-# SSH to server
-ssh root@tekms.com
-su - tekms
-
-# Clone and setup
-cd /home/tekms
-git clone git@github.com:gokhansancar82/tekms.git tekms-app
-cd tekms-app
-git checkout gokhan
-
-# Install and build
-npm install --legacy-peer-deps
-npx prisma generate
-npx prisma migrate deploy
-npx prisma db seed
-npm run build
-
-# Start with PM2
-pm2 start npm --name tekms -- start
-pm2 save
-pm2 startup
+npx prisma studio
+# Find your user and change role to "ADMIN"
 ```
-
-**Full deployment guide**: [`docs/DIGITALOCEAN_DEPLOYMENT.md`](docs/DIGITALOCEAN_DEPLOYMENT.md)
-
----
-
-## 📊 Subscription Tiers
-
-| Feature | Free | Professional | Enterprise |
-|---------|------|--------------|------------|
-| **Price** | $0 | $29/mo | $99/mo |
-| **Products** | 10 max | Unlimited | Unlimited |
-| **BigCommerce** | ✅ | ✅ | ✅ |
-| **Shopify** | ✅ | ✅ | ✅ |
-| **Etsy Import** | ❌ | ✅ | ✅ |
-| **TikTok Export** | ❌ | ✅ | ✅ |
-| **Bulk Operations** | ❌ | ✅ | ✅ |
-| **Scheduled Syncs** | ❌ | ✅ | ✅ |
-| **Advanced Analytics** | ❌ | ✅ | ✅ |
-| **API Access** | ❌ | ❌ | ✅ |
-| **Priority Support** | ❌ | ✅ | ✅ |
-
----
-
-## 🔐 Security
-
-- **Encryption**: AES-256-GCM for API credentials
-- **Password Hashing**: Bcrypt with 12 rounds
-- **Session Management**: Secure JWT tokens
-- **HTTPS**: SSL/TLS encryption enforced
-- **CSRF Protection**: Built-in with Next.js
-- **Database**: Encrypted connections
-- **Role-Based Access**: USER and ADMIN roles
-
----
-
-## 🛠️ Technology Stack
-
-- **Framework**: Next.js 15.2.4 (App Router)
-- **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Deployment**: DigitalOcean Droplet
-- **Process Manager**: PM2
-- **Web Server**: Nginx
-- **SSL**: Let's Encrypt
-
----
 
 ## 📁 Project Structure
 
 ```
-/app
-  /page.tsx                    Homepage
-  /dashboard/                  User dashboard
-  /products/                   Product management
-  /credentials/                API credentials
-  /billing/                    Subscription management
-  /admin/                      Admin panel
-  /privacy/                    Privacy policy
-  /terms/                      Terms of service
-  /api/                        API routes
-
-/components
-  /auth/                       Authentication components
-  /admin/                      Admin components
-  /ui/                         UI components (shadcn)
-
-/lib
-  /auth.ts                     NextAuth configuration
-  /subscription/               Subscription enforcement
-  /encryption.ts               AES-256-GCM encryption
-  /settings.ts                 Database settings manager
-  /db.ts                       Prisma client
-
-/prisma
-  /schema.prisma               Database schema
-  /seed.ts                     Initial data seeding
-  /migrations/                 Database migrations
+tekms-listing-manager/
+├── app/                    # Next.js app directory
+│   ├── admin/             # Admin panel pages
+│   ├── api/               # API routes
+│   ├── products/          # Product management
+│   └── stores/            # Store connections
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   └── auth/             # Auth components
+├── lib/                   # Utility functions
+│   ├── auth/             # Authentication
+│   ├── platforms/        # Platform integrations
+│   └── stripe/           # Stripe integration
+├── prisma/               # Database schema & migrations
+└── docs/                 # Documentation
 ```
 
----
+## 🔧 Configuration
 
-## 🔑 Admin Access
+### Admin Panel Configuration
+All system settings are managed via the admin panel at `/admin`:
 
-**Default Admin Credentials:**
-- Email: gokhansancar@gmail.com
-- Password: 123456789Gs_
+1. **System Settings** (`/admin/settings`)
+   - Stripe API keys
+   - Email SMTP settings
+   - OAuth credentials (Shopify, Etsy, TikTok)
+   - AI provider settings
 
-⚠️ **Change this password immediately after first login!**
+2. **Pricing Tiers** (`/admin/pricing`)
+   - Manage subscription tiers
+   - Configure Stripe price IDs
+   - Set product ranges and features
 
----
+3. **User Management** (`/admin/users`)
+   - View all users
+   - Manage roles and permissions
+   - Grant legacy feature access
 
-## 🔄 Updating Production
+4. **Page Management** (`/admin/pages`)
+   - Edit footer pages
+   - Manage legal documents
+   - SEO settings
 
-### Simple Update Script
+## 🔐 Security Features
 
-```bash
-# On server: /home/tekms/deploy.sh
-cd /home/tekms/tekms-app
-git pull origin gokhan
-npm install --legacy-peer-deps
-npx prisma generate
-npx prisma migrate deploy
-npm run build
-pm2 restart tekms
-echo "✅ Deployment complete!"
-```
+- **AES-256-GCM Encryption** - All API credentials encrypted at rest
+- **Database-Driven Secrets** - No sensitive data in code or env vars
+- **PKCE OAuth** - Etsy integration uses PKCE for enhanced security
+- **Rate Limiting** - API endpoints protected
+- **CSRF Protection** - Built into NextAuth.js
+- **SQL Injection Prevention** - Prisma ORM parameterized queries
 
-### Manual Update
+## 📊 API Endpoints
 
-```bash
-ssh root@tekms.com
-su - tekms
-cd /home/tekms/tekms-app
-git pull origin gokhan
-npm run build
-pm2 restart tekms
-```
+### Public APIs
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/callback/[provider]` - OAuth callbacks
 
----
+### Protected APIs
+- `GET /api/stores` - User's store connections
+- `GET /api/products` - User's products with search/filter
+- `POST /api/stores/connect` - Connect new store
+- `GET /api/usage` - Usage statistics
 
-## 📖 Documentation
-
-- [**Setup Guide**](docs/SETUP.md) - Local development setup
-- [**DigitalOcean Deployment**](docs/DIGITALOCEAN_DEPLOYMENT.md) - Production deployment
-- [**Google OAuth Setup**](docs/GOOGLE_OAUTH_SETUP.md) - OAuth configuration
-- [**Architecture Plan**](docs/saas-architecture-plan.md) - System architecture
-- [**Final Status**](docs/FINAL_STATUS.md) - Complete feature list
-
----
-
-## 🎯 Environment Variables
-
-Required variables:
-
-```env
-DATABASE_URL=              # PostgreSQL connection string
-NEXTAUTH_URL=             # Application URL
-NEXTAUTH_SECRET=          # Random 32-char string
-GOOGLE_CLIENT_ID=         # OAuth client ID
-GOOGLE_CLIENT_SECRET=     # OAuth client secret
-ENCRYPTION_KEY=           # Random 32-char encryption key
-NODE_ENV=                 # production or development
-```
-
-See `.env.example` for full configuration.
-
----
+### Admin APIs
+- `GET/POST /api/admin/settings` - System settings
+- `GET/PUT/DELETE /api/admin/pricing` - Pricing tiers
+- `GET/PUT/DELETE /api/admin/users` - User management
+- `GET/POST /api/admin/pages` - Page management
 
 ## 🧪 Testing
 
-### Run Tests Locally
-
 ```bash
-# Start development server
-npm run dev
+# Run tests (if configured)
+npm test
 
-# Test authentication
-- Sign up with Google
-- Sign up with email/password
-- Login
-- Access dashboard
+# Type checking
+npm run type-check
 
-# Test subscription limits
-- Try to access /etsy-import as FREE user
-- Try to access /tiktok-export as FREE user
-
-# Test admin features
-- Login as admin
-- Access /admin
-- Edit settings
-- Manage users
+# Linting
+npm run lint
 ```
 
----
+## 📦 Deployment
 
-## 🐛 Troubleshooting
+See [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for detailed deployment instructions.
 
-### Build Issues
+Quick deploy to Vercel:
 ```bash
-# Clear cache and rebuild
-rm -rf .next node_modules
-npm install --legacy-peer-deps
-npm run build
+vercel --prod
 ```
 
-### Database Issues
-```bash
-# Reset migrations (development only)
-npx prisma migrate reset
+## 🎯 Roadmap
 
-# Generate Prisma client
-npx prisma generate
-```
+- [ ] Real-time product sync
+- [ ] Advanced analytics dashboard
+- [ ] Bulk product operations
+- [ ] AI-powered SEO optimization
+- [ ] Multi-language support
+- [ ] White-label options
+- [ ] API for third-party integrations
+- [ ] Mobile app
 
-### PM2 Issues
-```bash
-# View logs
-pm2 logs tekms
+## 🤝 Contributing
 
-# Restart
-pm2 restart tekms
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-# Status
-pm2 status
-```
+## 📝 License
 
----
+This project is proprietary software. All rights reserved.
 
-## 📞 Support
+## 💬 Support
 
-- **Website**: https://tekms.com
-- **Email**: support@tekmslisting.com
-- **Privacy**: privacy@tekmslisting.com
-
----
-
-## 📄 License
-
-Proprietary - All rights reserved
-
----
+- **Documentation**: [docs/](docs/)
+- **Email**: support@tekms.com
+- **Issues**: [GitHub Issues](https://github.com/yourusername/tekms/issues)
 
 ## 🙏 Acknowledgments
 
-Built with:
-- [Next.js](https://nextjs.org)
-- [Prisma](https://www.prisma.io)
-- [NextAuth.js](https://next-auth.js.org)
-- [shadcn/ui](https://ui.shadcn.com)
-- [Tailwind CSS](https://tailwindcss.com)
+- Built with [Next.js](https://nextjs.org/)
+- UI components by [shadcn/ui](https://ui.shadcn.com/)
+- Icons by [Lucide](https://lucide.dev/)
+- Payments by [Stripe](https://stripe.com/)
 
 ---
 
-## 🎉 Success!
+**Made with ❤️ by the TEKMS Team**
 
-Your complete multi-tenant SaaS platform is ready!
-
-**Total Investment**: 100+ hours of development compressed into one day
-**Lines of Code**: 8,000+
-**Features**: 25+ major systems
-**Status**: Production-ready ✅
-
-**Start onboarding users today!** 🚀
+Version: 1.0.0 | Last Updated: 2025-10-12

@@ -1,344 +1,375 @@
 # TEKMS Listing Manager - Production Deployment Guide
 
-## 🚨 PRE-DEPLOYMENT CHECKLIST
+This guide will walk you through deploying TEKMS Listing Manager to production.
 
-Before deploying, ensure you have:
+## Prerequisites
 
-- [ ] Pushed all changes to GitHub (gokhan branch) ✅ DONE
-- [ ] Database is running (DigitalOcean PostgreSQL) ✅ ALREADY CONFIGURED
-- [ ] Production domain is set up (tekms.com) ✅ ALREADY CONFIGURED
-- [ ] SSL certificate is configured ✅ ALREADY CONFIGURED
-- [ ] PM2 is installed and configured ✅ ALREADY CONFIGURED
+- [ ] Domain name (e.g., tekms.com)
+- [ ] DigitalOcean account (or preferred hosting provider)
+- [ ] Stripe account
+- [ ] Email service (Zoho Mail or similar SMTP)
+- [ ] Developer accounts for platforms you want to support:
+  - [ ] BigCommerce Developer Account
+  - [ ] Shopify Partners Account
+  - [ ] Etsy Developer Account
+  - [ ] TikTok for Business Account
 
-## 📋 DEPLOYMENT STEPS
+## 1. Database Setup (DigitalOcean PostgreSQL)
 
-### Step 1: SSH into Production Server
+### Create Database
+1. Go to DigitalOcean → Databases
+2. Create a new PostgreSQL database cluster
+3. Choose your region (closest to your users)
+4. Select plan (minimum: Basic - $15/month)
+5. Wait for database to provision
+6. Copy the connection string
 
+### Configure Database
 ```bash
-ssh tekms@your-server-ip
-# Or if you have SSH alias configured:
-ssh tekms-server
-```
+# Set DATABASE_URL in your .env
+DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
 
-### Step 2: Navigate to Application Directory
-
-```bash
-cd /home/tekms/tekms-app
-```
-
-### Step 3: Update Production Environment Variables
-
-Before pulling changes, update your production `.env` file:
-
-```bash
-nano /home/tekms/tekms-app/.env
-```
-
-**CRITICAL: Update these values for production:**
-
-```env
-# ============================================
-# NEXTAUTH (PRODUCTION VALUES)
-# ============================================
-NEXTAUTH_URL="https://tekms.com"
-NODE_ENV="production"
-
-# ============================================
-# APP CONFIGURATION (PRODUCTION)
-# ============================================
-APP_URL="https://tekms.com"
-
-# ============================================
-# ENSURE THESE ARE SET (32+ characters)
-# ============================================
-NEXTAUTH_SECRET="your-secure-random-string-32-chars-minimum-change-this"
-ENCRYPTION_KEY="your-encryption-key-32-bytes-minimum-change-this"
-```
-
-**Keep these as-is (already configured):**
-- `DATABASE_URL` - DigitalOcean PostgreSQL connection
-- `GOOGLE_CLIENT_ID` - Your Google OAuth credentials
-- `GOOGLE_CLIENT_SECRET` - Your Google OAuth credentials
-- `INITIAL_ADMIN_EMAIL` - gokhansancar@gmail.com
-- `INITIAL_ADMIN_PASSWORD` - Your admin password
-
-Save and exit (Ctrl+X, then Y, then Enter)
-
-### Step 4: Run the Deployment Script
-
-```bash
-# Make sure script is executable
-chmod +x /home/tekms/tekms-app/deploy.sh
-
-# Run deployment
-./deploy.sh
-```
-
-**The script will automatically:**
-1. Pull latest changes from GitHub (gokhan branch)
-2. Install dependencies
-3. Generate Prisma client
-4. Run database migrations (including new Settings table)
-5. Build the Next.js application
-6. Restart PM2
-
-### Step 5: Verify Deployment
-
-```bash
-# Check PM2 status
-pm2 status
-
-# View recent logs
-pm2 logs tekms --lines 50
-
-# Check if app is responding
-curl https://tekms.com/api/health
-```
-
-### Step 6: Update PM2 Environment (if needed)
-
-If you see environment variable issues in logs:
-
-```bash
-pm2 restart tekms --update-env
-pm2 save
-```
-
-## 🔍 POST-DEPLOYMENT VERIFICATION
-
-### 1. Check Homepage
-Visit: https://tekms.com
-- Should see the new blue-cyan gradient homepage
-- Navigation should work
-- "Sign In" and "Get Started Free" buttons should appear
-
-### 2. Test Authentication
-- Click "Sign In"
-- Try Google OAuth login
-- Try email/password registration
-- Verify redirect after login
-
-### 3. Test User Dashboard
-Login and check:
-- `/dashboard` - Should show new modern dashboard
-- `/stores` - Should show store connection page
-- `/billing` - Should show billing dashboard
-
-### 4. Test Admin Panel (Login as admin)
-- `/admin` - Should show admin dashboard with 6 cards
-- `/admin/settings` - Should show System Settings with 5 tabs
-
-### 5. Check Database Migrations
-```bash
-# On server
-cd /home/tekms/tekms-app
-npx prisma studio
-```
-Verify these tables exist:
-- `User`
-- `Account`
-- `Session`
-- `Store`
-- `StoreSubscription`
-- `StorePricingTier`
-- `Settings` ← NEW TABLE
-
-## 🐛 TROUBLESHOOTING
-
-### Issue: "UntrustedHost" Error
-
-**Solution:** Ensure `.env` has:
-```env
-NEXTAUTH_URL="https://tekms.com"
-NODE_ENV="production"
-```
-Then restart PM2:
-```bash
-pm2 restart tekms --update-env
-pm2 save
-```
-
-### Issue: Google OAuth Not Working
-
-**Solution:** Update Google OAuth settings:
-1. Go to: https://console.cloud.google.com/apis/credentials
-2. Edit your OAuth 2.0 Client ID
-3. Add to **Authorized redirect URIs**:
-   - `https://tekms.com/api/auth/callback/google`
-4. Save changes
-
-### Issue: Database Connection Failed
-
-**Solution:** Check database credentials:
-```bash
-# Test connection
-psql "$DATABASE_URL" -c "SELECT 1;"
-```
-
-If fails, verify DATABASE_URL in `.env` matches DigitalOcean credentials.
-
-### Issue: Build Errors
-
-**Solution:**
-```bash
-cd /home/tekms/tekms-app
-rm -rf .next
-rm -rf node_modules
-npm install --legacy-peer-deps
-npm run build
-pm2 restart tekms
-```
-
-### Issue: Migration Errors
-
-**Solution:**
-```bash
-# Check migration status
-npx prisma migrate status
-
-# Force reset (CAUTION: Only if safe)
-npx prisma migrate reset
-
-# Or deploy specific migration
+# Run migrations
 npx prisma migrate deploy
+
+# Seed pricing tiers
+npx tsx prisma/seed-pricing-tiers.ts
+
+# Seed footer pages
+npx tsx prisma/seed-pages.ts
 ```
 
-## 📊 MONITORING
+## 2. Environment Variables
 
-### View Real-Time Logs
+Create a `.env.production` file with the following:
+
+```env
+# App
+NODE_ENV=production
+NEXTAUTH_URL=https://tekms.com
+NEXTAUTH_SECRET=<generate-with-openssl-rand-base64-32>
+
+# Database
+DATABASE_URL=<your-digitalocean-postgresql-url>
+
+# Encryption (for API keys/secrets storage)
+ENCRYPTION_KEY=<generate-with-openssl-rand-hex-32>
+
+# Google OAuth (Optional - for admin/user login)
+GOOGLE_CLIENT_ID=<from-google-cloud-console>
+GOOGLE_CLIENT_SECRET=<from-google-cloud-console>
+
+# The following are managed via Admin Panel:
+# - Stripe keys (stripe_secret_key, stripe_publishable_key, stripe_webhook_secret)
+# - Email settings (email_provider, email_api_key, etc.)
+# - OAuth platform credentials (shopify_client_id, etsy_client_id, etc.)
+```
+
+### Generate Secure Keys
 ```bash
-pm2 logs tekms
+# Generate NEXTAUTH_SECRET
+openssl rand -base64 32
+
+# Generate ENCRYPTION_KEY
+openssl rand -hex 32
 ```
 
-### View Error Logs Only
+## 3. Platform OAuth Setup
+
+### 3.1 Shopify OAuth App
+
+1. Go to [Shopify Partners](https://partners.shopify.com/)
+2. Click "Apps" → "Create App"
+3. Choose "Public app"
+4. Fill in:
+   - App name: "TEKMS Listing Manager"
+   - App URL: `https://tekms.com`
+   - Allowed redirection URL(s): `https://tekms.com/api/auth/callback/shopify`
+5. Under "API credentials":
+   - Copy **Client ID**
+   - Copy **Client Secret**
+6. Set required scopes:
+   - `read_products`
+   - `write_products`
+   - `read_inventory`
+   - `write_inventory`
+
+**Admin Panel Configuration:**
+- Navigate to: Admin → System Settings → OAuth → Shopify
+- Enter Client ID
+- Enter Client Secret
+- Enter Redirect URI: `https://tekms.com/api/auth/callback/shopify`
+
+### 3.2 Etsy OAuth App
+
+1. Go to [Etsy Developers](https://www.etsy.com/developers/)
+2. Create a new app
+3. Fill in app details
+4. Important: Etsy uses PKCE (no client secret needed)
+5. Copy your **Keystring** (this is your API Key/Client ID)
+
+**Admin Panel Configuration:**
+- Navigate to: Admin → System Settings → OAuth → Etsy
+- Enter Keystring (API Key)
+- No client secret needed (Etsy uses PKCE)
+- No redirect URI registration needed in Etsy portal
+
+### 3.3 TikTok for Business
+
+1. Go to [TikTok for Developers](https://developers.tiktok.com/)
+2. Create a new app
+3. Enable "TikTok Shop" permissions
+4. Set redirect URI: `https://tekms.com/api/auth/callback/tiktok`
+5. Copy:
+   - **App ID** (Client ID)
+   - **App Secret** (Client Secret)
+
+**Admin Panel Configuration:**
+- Navigate to: Admin → System Settings → OAuth → TikTok
+- Enter Client ID
+- Enter Client Secret
+- Enter Redirect URI: `https://tekms.com/api/auth/callback/tiktok`
+
+### 3.4 BigCommerce (API Credentials Only)
+
+BigCommerce doesn't use OAuth flow like others. Users need to:
+1. Get their **Store Hash** from BigCommerce admin URL
+2. Generate **API Access Token** from BigCommerce → Advanced Settings → API Accounts
+
+Users enter these directly in their store connection settings.
+
+## 4. Stripe Setup
+
+### Create Products and Prices
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/)
+2. For each pricing tier, create:
+   - A product (e.g., "Starter Tier")
+   - Monthly recurring price
+   - Yearly recurring price (optional)
+3. Copy each price ID (starts with `price_`)
+
+### Configure Webhook
+1. Go to Stripe → Developers → Webhooks
+2. Add endpoint: `https://tekms.com/api/stripe/webhook`
+3. Select events:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+4. Copy **Webhook Signing Secret**
+
+**Admin Panel Configuration:**
+- Navigate to: Admin → System Settings → Stripe
+- Enter Secret Key (sk_live_...)
+- Enter Publishable Key (pk_live_...)
+- Enter Webhook Secret (whsec_...)
+
+**Update Pricing Tiers:**
+- Navigate to: Admin → Pricing Tiers
+- Edit each tier and add the Stripe Price IDs you created
+
+## 5. Email Configuration (Zoho Mail)
+
+### Zoho Mail SMTP Setup
+1. Create a Zoho Mail account
+2. Go to Zoho Mail → Settings → Mail Accounts → IMAP Access
+3. Enable IMAP access
+4. Generate App Password
+
+**Admin Panel Configuration:**
+- Navigate to: Admin → System Settings → Email
+- Provider: `smtp` (or custom provider)
+- SMTP Host: `smtp.zoho.com`
+- SMTP Port: `465`
+- SMTP User: your@domain.com
+- SMTP Password: (app password)
+- From Address: noreply@tekms.com
+- From Name: TEKMS Listing Manager
+
+## 6. Application Deployment
+
+### Option A: Vercel (Recommended)
+
+1. **Connect GitHub Repository**
+   ```bash
+   git remote add origin https://github.com/yourusername/tekms.git
+   git push -u origin main
+   ```
+
+2. **Import to Vercel**
+   - Go to [Vercel](https://vercel.com)
+   - Click "Import Project"
+   - Connect GitHub and select your repository
+   - Configure project:
+     - Framework: Next.js
+     - Root Directory: ./
+     - Build Command: `npm run build`
+     - Output Directory: .next
+
+3. **Environment Variables**
+   - Add all variables from `.env.production`
+   - Deploy!
+
+4. **Custom Domain**
+   - Go to Project Settings → Domains
+   - Add your domain (tekms.com)
+   - Update DNS records as instructed
+
+### Option B: DigitalOcean App Platform
+
+1. **Create App**
+   ```bash
+   # Push to GitHub first
+   git remote add origin https://github.com/yourusername/tekms.git
+   git push -u origin main
+   ```
+
+2. **Configure App**
+   - Go to DigitalOcean → Apps
+   - Create App from GitHub
+   - Select repository
+   - Set build command: `npm run build`
+   - Set run command: `npm start`
+
+3. **Environment Variables**
+   - Add all from `.env.production`
+   - Click "Deploy"
+
+4. **Custom Domain**
+   - Add domain in App settings
+   - Update DNS records
+
+## 7. DNS Configuration
+
+Point your domain to your hosting provider:
+
+### Vercel
+```
+A     @      76.76.21.21
+CNAME www    cname.vercel-dns.com
+```
+
+### DigitalOcean
+```
+A     @      <your-app-ip>
+CNAME www    <your-app-name>.ondigitalocean.app
+```
+
+## 8. Post-Deployment Checklist
+
+### Admin Configuration
+- [ ] Log in with admin account
+- [ ] Configure all System Settings (Stripe, Email, OAuth)
+- [ ] Update pricing tiers with Stripe price IDs
+- [ ] Create/edit footer pages (About, Contact, Privacy, etc.)
+- [ ] Test email sending
+- [ ] Test user registration
+
+### OAuth Testing
+- [ ] Test Shopify connection (create test store)
+- [ ] Test Etsy connection
+- [ ] Test TikTok connection
+- [ ] Verify product sync works
+
+### Billing Testing
+- [ ] Create test user
+- [ ] Connect test store
+- [ ] Verify automatic tier assignment
+- [ ] Test Stripe checkout flow
+- [ ] Verify webhook processing
+- [ ] Test subscription management
+
+### Security
+- [ ] Enable HTTPS (should be automatic)
+- [ ] Test CORS settings
+- [ ] Verify API rate limiting
+- [ ] Check error logging
+- [ ] Set up monitoring (Vercel Analytics or similar)
+
+## 9. Creating First Admin User
+
 ```bash
-pm2 logs tekms --err
+# Connect to your production database
+psql $DATABASE_URL
+
+# Create admin user (replace with your email)
+UPDATE users 
+SET role = 'ADMIN' 
+WHERE email = 'your-admin@email.com';
 ```
 
-### View Application Metrics
+Or use Prisma Studio:
 ```bash
-pm2 monit
+npx prisma studio --url $DATABASE_URL
 ```
 
-### Check Memory/CPU Usage
+## 10. Monitoring and Maintenance
+
+### Regular Tasks
+- Monitor Stripe dashboard for failed payments
+- Check error logs in Vercel/DigitalOcean
+- Review user activity and product sync jobs
+- Update pricing tiers as needed
+- Respond to support emails
+
+### Database Backups
+- DigitalOcean automatically backs up managed databases
+- Consider additional automated backups for safety
+
+### Updates
 ```bash
-pm2 list
+# Pull latest changes
+git pull origin main
+
+# Run new migrations
+npx prisma migrate deploy
+
+# Restart application (automatic on Vercel)
 ```
 
-## 🔐 SECURITY CHECKLIST AFTER DEPLOYMENT
+## 11. Troubleshooting
 
-- [ ] NEXTAUTH_SECRET is strong random string (32+ chars)
-- [ ] ENCRYPTION_KEY is strong random string (32+ chars)
-- [ ] Database credentials are secure
-- [ ] Google OAuth redirect URI is updated to https://tekms.com
-- [ ] Admin password is changed from default
-- [ ] Firewall is configured (only ports 80, 443, 22 open)
-- [ ] SSL certificate is valid and auto-renewing
+### OAuth Not Working
+- Verify redirect URIs match exactly (no trailing slash)
+- Check that credentials are entered in Admin Panel
+- Ensure database is reading settings correctly
+- Check browser console for errors
 
-## 🎯 NEXT STEPS AFTER DEPLOYMENT
+### Stripe Webhooks Failing
+- Verify webhook secret in Admin Panel
+- Check webhook endpoint is publicly accessible
+- Review Stripe webhook logs for errors
 
-### 1. Configure OAuth Apps (CRITICAL)
-As admin, visit: https://tekms.com/admin/settings
+### Email Not Sending
+- Verify SMTP credentials in Admin Panel
+- Check email provider allows app passwords
+- Test with simple email first
+- Review email logs in database
 
-**Configure OAuth for each platform:**
+### Database Connection Issues
+- Check DATABASE_URL format
+- Verify database cluster is running
+- Check connection limits
+- Review database logs in DigitalOcean
 
-#### Shopify
-- Register app at: https://partners.shopify.com/
-- Add OAuth credentials in Admin > Settings > OAuth tab
-- Redirect URI: `https://tekms.com/api/auth/callback/shopify`
+## 12. Production URLs
 
-#### Etsy
-- Register app at: https://www.etsy.com/developers/
-- Add OAuth credentials in Admin > Settings > OAuth tab
-- Redirect URI: `https://tekms.com/api/auth/callback/etsy`
+After deployment, your app will be available at:
+- **Main App**: https://tekms.com
+- **Admin Panel**: https://tekms.com/admin
+- **API Endpoints**: https://tekms.com/api/*
 
-#### BigCommerce
-- Register app at: https://developer.bigcommerce.com/
-- Add OAuth credentials in Admin > Settings > OAuth tab
-- Redirect URI: `https://tekms.com/api/auth/callback/bigcommerce`
+## Support
 
-#### TikTok
-- Register app at: https://seller-us.tiktok.com/open
-- Add OAuth credentials in Admin > Settings > OAuth tab
-- Redirect URI: `https://tekms.com/api/auth/callback/tiktok`
-
-### 2. Configure Stripe (For Billing)
-Visit: https://tekms.com/admin/settings > Stripe tab
-
-Get credentials from: https://dashboard.stripe.com/apikeys
-- Add Secret Key
-- Add Publishable Key
-- Configure Webhook (https://tekms.com/api/webhooks/stripe)
-- Add Webhook Secret
-
-### 3. Test Store Connections
-1. Login as a test user
-2. Go to: https://tekms.com/stores
-3. Click "Connect Store"
-4. Test OAuth flow for each platform
-
-### 4. Verify Billing
-1. Connect a store
-2. Check subscription created in `/billing`
-3. Verify Stripe dashboard shows subscription
-4. Test upgrade/downgrade flows
-
-## 📱 DEPLOYMENT COMMAND SUMMARY
-
-Quick reference for future deployments:
-
-```bash
-# 1. SSH to server
-ssh tekms@your-server
-
-# 2. Navigate to app
-cd /home/tekms/tekms-app
-
-# 3. Deploy
-./deploy.sh
-
-# 4. Verify
-pm2 logs tekms --lines 50
-curl https://tekms.com/api/health
-
-# 5. Update environment if needed
-pm2 restart tekms --update-env
-pm2 save
-```
-
-## 🆘 EMERGENCY ROLLBACK
-
-If deployment breaks production:
-
-```bash
-# 1. Check last working commit
-git log --oneline -10
-
-# 2. Rollback to previous commit
-git checkout <previous-commit-hash>
-
-# 3. Rebuild and restart
-npm run build
-pm2 restart tekms
-
-# 4. Or rollback migrations if needed
-npx prisma migrate resolve --rolled-back <migration-name>
-```
-
-## ✅ SUCCESS INDICATORS
-
-Deployment is successful when:
-- ✅ `pm2 status` shows tekms as "online"
-- ✅ https://tekms.com loads without errors
-- ✅ Homepage shows new blue-cyan design
-- ✅ Login/register works
-- ✅ Dashboard shows new features
-- ✅ Admin panel is accessible
-- ✅ No errors in `pm2 logs tekms`
+For issues:
+1. Check this deployment guide
+2. Review error logs
+3. Check database for data consistency
+4. Contact support@tekms.com
 
 ---
 
-**Need Help?**
-- Check logs: `pm2 logs tekms`
-- View this guide: `cat /home/tekms/tekms-app/docs/DEPLOYMENT_GUIDE.md`
-- Database issues: Check `docs/SETUP.md`
+**Last Updated**: 2025-10-12
+**Version**: 1.0.0

@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
       icon: DollarSign,
       href: '/admin/pricing',
       color: 'from-green-600 to-emerald-600',
-      badge: 'Coming Soon'
+      badge: null
     },
     {
       title: 'User Management',
@@ -73,7 +73,7 @@ export default function AdminDashboardPage() {
       icon: Users,
       href: '/admin/users',
       color: 'from-purple-600 to-pink-600',
-      badge: 'Coming Soon'
+      badge: null
     },
     {
       title: 'Store Connections',

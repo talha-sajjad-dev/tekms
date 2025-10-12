@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Package, User, Settings, LogOut, LayoutDashboard } from "lucide-react"
 
 interface HomepageNavProps {
-  onSignInClick: () => void
+  onSignInClick?: () => void
 }
 
 export function HomepageNav({ onSignInClick }: HomepageNavProps) {
@@ -95,10 +95,13 @@ export function HomepageNav({ onSignInClick }: HomepageNavProps) {
               </DropdownMenu>
             ) : (
               <>
-                <Button variant="ghost" onClick={onSignInClick}>
+                <Button
+                  variant="ghost"
+                  onClick={onSignInClick || (() => router.push('/'))}
+                >
                   Sign In
                 </Button>
-                <Button onClick={onSignInClick}>
+                <Button onClick={onSignInClick || (() => router.push('/'))}>
                   Get Started
                 </Button>
               </>

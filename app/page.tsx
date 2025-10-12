@@ -274,46 +274,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#E2E8F0] bg-white">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                  <ShoppingCart className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">TEKMS</span>
-              </div>
-              <p className="text-[#64748B] mb-4 max-w-sm leading-relaxed">
-                The all-in-one marketplace management platform for modern e-commerce sellers.
-              </p>
-              <p className="text-sm text-[#94A3B8]">
-                © 2024 TEKMS Listing Manager. All rights reserved.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4 text-[#0F172A]">Product</h3>
-              <ul className="space-y-2 text-sm text-[#64748B]">
-                <li><a href="#features" className="hover:text-blue-600 transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-blue-600 transition-colors">Pricing</a></li>
-                <li><a href="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4 text-[#0F172A]">Legal</h3>
-              <ul className="space-y-2 text-sm text-[#64748B]">
-                <li><a href="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</a></li>
-                <li><a href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</a></li>
-                <li><a href="mailto:support@tekmslisting.com" className="hover:text-blue-600 transition-colors">Contact</a></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
-
       {/* Auth Modal */}
       <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
     </div>
