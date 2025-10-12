@@ -57,6 +57,13 @@ export default function StoresPageContent() {
   const [loading, setLoading] = useState(true)
   const [disconnectId, setDisconnectId] = useState<string | null>(null)
   const [showConnectModal, setShowConnectModal] = useState(false)
+  const [showBigCommerceForm, setShowBigCommerceForm] = useState(false)
+  const [bcFormData, setBcFormData] = useState({
+    storeHash: '',
+    accessToken: '',
+    storeName: ''
+  })
+  const [bcConnecting, setBcConnecting] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -217,6 +224,12 @@ export default function StoresPageContent() {
   const handleConnectPlatform = async (platform: string) => {
     setShowConnectModal(false)
     
+    // BigCommerce requires manual credentials, others use OAuth
+    if (platform === 'BIGCOMMERCE') {
+      setShowBigCommerceForm(true)
+      return
+    }
+    
     try {
       const platformLower = platform.toLowerCase()
       const res = await fetch(`/api/auth/connect/${platformLower}`, {
@@ -232,7 +245,7 @@ export default function StoresPageContent() {
       } else {
         toast({
           title: "Connection Failed",
-          description: data.error || `Failed to initiate ${PLATFORMS.find(p => p.value === platform)?.label} connection`,
+          description: data.error || `Failed to initiate ${PLATFORMS.find(p => p.value === platform)?.label} connection. Make sure OAuth credentials are configured in Admin → System Settings.`,
           variant: "destructive",
         })
       }
@@ -442,10 +455,10 @@ export default function StoresPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Connect Store Modal - Will implement next */}
+      {/* Connect Store Modal */}
       {showConnectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowConnectModal(false)}>
+          <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <CardHeader>
               <CardTitle>Connect Store</CardTitle>
               <CardDescription>Choose a platform to connect</CardDescription>
@@ -455,7 +468,7 @@ export default function StoresPageContent() {
                 <Button
                   key={platform.value}
                   variant="outline"
-                  className="h-24 flex flex-col gap-2"
+                  className="h-24 flex flex-col gap-2 hover:border-primary"
                   onClick={() => handleConnectPlatform(platform.value)}
                 >
                   <span className="text-3xl">{platform.icon}</span>
@@ -466,6 +479,131 @@ export default function StoresPageContent() {
             <div className="p-4 border-t">
               <Button variant="ghost" onClick={() => setShowConnectModal(false)} className="w-full">
                 Cancel
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* BigCommerce Credentials Form */}
+      {showBigCommerceForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowBigCommerceForm(false)}>
+          <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle>Connect BigCommerce Store</CardTitle>
+              <CardDescription>
+                Enter your BigCommerce store credentials. You can find these in your BigCommerce admin.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Store Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-md"
+                  placeholder="My BigCommerce Store"
+                  value={bcFormData.storeName}
+                  onChange={(e) => setBcFormData({...bcFormData, storeName: e.target.value})}
+                />
+                <p className="text-xs text-muted-foreground">A friendly name for your store</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Store Hash</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+                  placeholder="abc123def"
+                  value={bcFormData.storeHash}
+                  onChange={(e) => setBcFormData({...bcFormData, storeHash: e.target.value})}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Found in your store's URL: https://store-<strong>abc123def</strong>.mybigcommerce.com
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Access Token</label>
+                <input
+                  type="password"
+                  className="w-full px-3 py-2 border rounded-md font-mono text-sm"
+                  placeholder="v2_..."
+                  value={bcFormData.accessToken}
+                  onChange={(e) => setBcFormData({...bcFormData, accessToken: e.target.value})}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Generate from BigCommerce → Advanced Settings → API Accounts
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs text-blue-900">
+                  <strong>Need help?</strong> Go to your BigCommerce admin → Advanced Settings → API Accounts →
+                  Create API Account → Select required scopes (read/write products) → Save to get your access token.
+                </p>
+              </div>
+            </CardContent>
+            <div className="p-4 border-t flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowBigCommerceForm(false)
+                  setBcFormData({storeHash: '', accessToken: '', storeName: ''})
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!bcFormData.storeName || !bcFormData.storeHash || !bcFormData.accessToken) {
+                    toast({
+                      title: "Missing Information",
+                      description: "Please fill in all fields",
+                      variant: "destructive"
+                    })
+                    return
+                  }
+                  
+                  setBcConnecting(true)
+                  try {
+                    const res = await fetch('/api/auth/connect/bigcommerce', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(bcFormData)
+                    })
+                    
+                    const data = await res.json()
+                    
+                    if (res.ok) {
+                      toast({
+                        title: "Store Connected!",
+                        description: `${bcFormData.storeName} has been connected successfully.`,
+                      })
+                      setShowBigCommerceForm(false)
+                      setBcFormData({storeHash: '', accessToken: '', storeName: ''})
+                      fetchStores()
+                    } else {
+                      toast({
+                        title: "Connection Failed",
+                        description: data.error || "Failed to connect BigCommerce store",
+                        variant: "destructive"
+                      })
+                    }
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to connect store",
+                      variant: "destructive"
+                    })
+                  } finally {
+                    setBcConnecting(false)
+                  }
+                }}
+                disabled={bcConnecting}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600"
+              >
+                {bcConnecting ? "Connecting..." : "Connect Store"}
               </Button>
             </div>
           </Card>

@@ -1,8 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { LoadingLink } from "@/components/ui/loading-link"
 
 export function NavBar() {
   const pathname = usePathname()
@@ -25,7 +25,7 @@ export function NavBar() {
         <div className="mr-8 font-bold text-lg">BigCommerce API</div>
         <nav className="flex items-center space-x-6 text-sm font-medium">
           {links.map((link) => (
-            <Link
+            <LoadingLink
               key={link.href}
               href={link.href}
               className={cn(
@@ -34,7 +34,7 @@ export function NavBar() {
               )}
             >
               {link.label}
-            </Link>
+            </LoadingLink>
           ))}
         </nav>
       </div>

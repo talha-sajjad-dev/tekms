@@ -10,12 +10,13 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { 
-  Settings, 
-  Key, 
-  Mail, 
-  Bot, 
-  Store, 
+import { SuccessToast } from '@/components/ui/success-toast'
+import {
+  Settings,
+  Key,
+  Mail,
+  Bot,
+  Store,
   Save,
   Eye,
   EyeOff,
@@ -42,6 +43,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<Setting[]>([])
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -100,12 +103,12 @@ export default function AdminSettingsPage() {
       const data = await res.json()
 
       if (res.ok) {
+        setSuccessMessage(`${category.charAt(0).toUpperCase() + category.slice(1)} settings saved successfully!`)
+        setShowSuccess(true)
         toast({
           title: 'Settings Saved',
           description: `${category} settings have been updated successfully`
         })
-        // Don't refetch immediately - settings are already updated in local state
-        // This prevents the "disappearing" issue where refetch happens too quickly
       } else {
         toast({
           title: 'Error',
@@ -151,7 +154,14 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <>
+      {showSuccess && (
+        <SuccessToast
+          message={successMessage}
+          onClose={() => setShowSuccess(false)}
+        />
+      )}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
       <header className="border-b bg-white/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
@@ -286,52 +296,97 @@ export default function AdminSettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Email Settings */}
+          {/* Email Settings - Zoho Mail SMTP */}
           <TabsContent value="email" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Email Configuration</CardTitle>
+                <CardTitle>Email Configuration (Zoho Mail SMTP)</CardTitle>
                 <CardDescription>
-                  Configure your email service provider
+                  Configure Zoho Mail SMTP for sending transactional emails
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email_provider">Provider</Label>
+                  <Label htmlFor="smtp_host">SMTP Host</Label>
                   <Input
-                    id="email_provider"
-                    value={getSetting('email_provider')}
-                    onChange={(e) => updateSetting('email_provider', e.target.value)}
-                    placeholder="resend"
+                    id="smtp_host"
+                    value={getSetting('smtp_host')}
+                    onChange={(e) => updateSetting('smtp_host', e.target.value)}
+                    placeholder="smtp.zoho.com"
                   />
                   <p className="text-xs text-gray-500">
-                    Email service provider (resend, sendgrid, etc.)
+                    Zoho Mail SMTP server (smtp.zoho.com)
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp_port">SMTP Port</Label>
+                    <Input
+                      id="smtp_port"
+                      value={getSetting('smtp_port')}
+                      onChange={(e) => updateSetting('smtp_port', e.target.value)}
+                      placeholder="465"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Use 465 for SSL
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="smtp_secure">Security</Label>
+                    <Input
+                      id="smtp_secure"
+                      value={getSetting('smtp_secure')}
+                      onChange={(e) => updateSetting('smtp_secure', e.target.value)}
+                      placeholder="true"
+                    />
+                    <p className="text-xs text-gray-500">
+                      true for SSL/TLS
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="smtp_user">SMTP Username (Email)</Label>
+                  <Input
+                    id="smtp_user"
+                    type="email"
+                    value={getSetting('smtp_user')}
+                    onChange={(e) => updateSetting('smtp_user', e.target.value)}
+                    placeholder="noreply@yourdomain.com"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Your Zoho Mail email address
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email_api_key">API Key</Label>
+                  <Label htmlFor="smtp_password">SMTP Password (App Password)</Label>
                   <div className="flex gap-2">
                     <Input
-                      id="email_api_key"
-                      type={showSecrets['email_api_key'] ? 'text' : 'password'}
-                      value={getSetting('email_api_key')}
-                      onChange={(e) => updateSetting('email_api_key', e.target.value)}
-                      placeholder="re_..."
+                      id="smtp_password"
+                      type={showSecrets['smtp_password'] ? 'text' : 'password'}
+                      value={getSetting('smtp_password')}
+                      onChange={(e) => updateSetting('smtp_password', e.target.value)}
+                      placeholder="App-specific password"
                       className="font-mono"
                     />
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => toggleShowSecret('email_api_key')}
+                      onClick={() => toggleShowSecret('smtp_password')}
                     >
-                      {showSecrets['email_api_key'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showSecrets['smtp_password'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Generate app password in Zoho Mail → Settings → Security
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email_from_address">From Address</Label>
+                  <Label htmlFor="email_from_address">From Email Address</Label>
                   <Input
                     id="email_from_address"
                     type="email"
@@ -339,6 +394,9 @@ export default function AdminSettingsPage() {
                     onChange={(e) => updateSetting('email_from_address', e.target.value)}
                     placeholder="noreply@tekms.com"
                   />
+                  <p className="text-xs text-gray-500">
+                    Email address to send from (must match SMTP user)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -349,10 +407,20 @@ export default function AdminSettingsPage() {
                     onChange={(e) => updateSetting('email_from_name', e.target.value)}
                     placeholder="TEKMS Listing Manager"
                   />
+                  <p className="text-xs text-gray-500">
+                    Display name for outgoing emails
+                  </p>
                 </div>
 
-                <Button 
-                  onClick={() => handleSave('email')} 
+                <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-xs text-blue-900">
+                    <strong>Setup Instructions:</strong> Log into Zoho Mail → Settings → Security →
+                    Application-Specific Passwords → Generate new password for "TEKMS App"
+                  </p>
+                </div>
+
+                <Button
+                  onClick={() => handleSave('email')}
                   disabled={saving}
                   className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
                 >
@@ -493,15 +561,34 @@ export default function AdminSettingsPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor={`${platform}_redirect_uri`}>Redirect URI</Label>
-                          <Input
-                            id={`${platform}_redirect_uri`}
-                            value={getSetting(`${platform}_redirect_uri`)}
-                            onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
-                            placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
-                            className="font-mono text-sm"
-                          />
+                          <div className="flex gap-2">
+                            <Input
+                              id={`${platform}_redirect_uri`}
+                              value={getSetting(`${platform}_redirect_uri`)}
+                              onChange={(e) => updateSetting(`${platform}_redirect_uri`, e.target.value)}
+                              placeholder={`https://yourdomain.com/api/auth/callback/${platform}`}
+                              className="font-mono text-sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const uri = getSetting(`${platform}_redirect_uri`) || `${window.location.origin}/api/auth/callback/${platform}`
+                                navigator.clipboard.writeText(uri)
+                                toast({
+                                  title: "Copied!",
+                                  description: "Redirect URI copied to clipboard"
+                                })
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
                           <p className="text-xs text-gray-500">
-                            Register this URL in your {platform} app configuration
+                            <strong>Register this exact URL</strong> in your {platform === 'shopify' ? 'Shopify Partners' : platform === 'tiktok' ? 'TikTok Developer' : platform} app → Allowed redirect URI(s)
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            Example: {window.location.origin}/api/auth/callback/{platform}
                           </p>
                         </div>
                       </>
@@ -588,5 +675,6 @@ export default function AdminSettingsPage() {
         </Tabs>
       </div>
     </div>
+    </>
   )
 }
