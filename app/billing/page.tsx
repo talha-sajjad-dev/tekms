@@ -21,13 +21,26 @@ interface BillingData {
   stores: StoreWithBilling[]
 }
 
+interface PaymentMethod {
+  id: string
+  brand: string
+  last4: string
+  expMonth: number
+  expYear: number
+  isDefault: boolean
+}
+
 export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [billingData, setBillingData] = useState<BillingData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [addingPayment, setAddingPayment] = useState(false)
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(true)
 
   useEffect(() => {
     fetchBillingData()
+    fetchPaymentMethods()
   }, [])
 
   const fetchBillingData = async () => {
@@ -41,6 +54,44 @@ export default function BillingPage() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPaymentMethods = async () => {
+    try {
+      setLoadingPaymentMethods(true)
+      const response = await fetch('/api/stripe/payment-methods')
+      if (response.ok) {
+        const data = await response.json()
+        setPaymentMethods(data.paymentMethods || [])
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch payment methods:', err)
+    } finally {
+      setLoadingPaymentMethods(false)
+    }
+  }
+
+  const handleAddPaymentMethod = async () => {
+    try {
+      setAddingPayment(true)
+      const response = await fetch('/api/stripe/create-setup-session', {
+        method: 'POST',
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+      
+      const { url } = await response.json()
+      
+      if (url) {
+        // Redirect to Stripe checkout
+        window.location.href = url
+      }
+    } catch (err: any) {
+      setError(err.message)
+      setAddingPayment(false)
     }
   }
 
@@ -117,21 +168,68 @@ export default function BillingPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payment Method
+              Payment Methods
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600">No payment method on file</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Add a payment method to enable paid features
-                </p>
+            {loadingPaymentMethods ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
               </div>
-              <Button className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
-                Add Payment Method
-              </Button>
-            </div>
+            ) : paymentMethods.length === 0 ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600">No payment method on file</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Add a payment method to enable paid features
+                  </p>
+                </div>
+                <Button
+                  onClick={handleAddPaymentMethod}
+                  disabled={addingPayment}
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                >
+                  {addingPayment ? 'Redirecting...' : 'Add Payment Method'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {paymentMethods.map((pm) => (
+                  <div
+                    key={pm.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:border-blue-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-8 bg-gradient-to-r from-blue-600 to-cyan-600 rounded flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold capitalize">{pm.brand}</span>
+                          <span className="text-gray-600">•••• {pm.last4}</span>
+                          {pm.isDefault && (
+                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          Expires {pm.expMonth}/{pm.expYear}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={handleAddPaymentMethod}
+                  disabled={addingPayment}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {addingPayment ? 'Redirecting...' : '+ Add Another Payment Method'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

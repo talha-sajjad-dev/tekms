@@ -58,12 +58,15 @@ export default function StoresPageContent() {
   const [disconnectId, setDisconnectId] = useState<string | null>(null)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [showBigCommerceForm, setShowBigCommerceForm] = useState(false)
+  const [showShopifyForm, setShowShopifyForm] = useState(false)
   const [bcFormData, setBcFormData] = useState({
     storeHash: '',
     accessToken: '',
     storeName: ''
   })
+  const [shopifyShop, setShopifyShop] = useState('')
   const [bcConnecting, setBcConnecting] = useState(false)
+  const [shopifyConnecting, setShopifyConnecting] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -224,12 +227,19 @@ export default function StoresPageContent() {
   const handleConnectPlatform = async (platform: string) => {
     setShowConnectModal(false)
     
-    // BigCommerce requires manual credentials, others use OAuth
+    // BigCommerce requires manual credentials
     if (platform === 'BIGCOMMERCE') {
       setShowBigCommerceForm(true)
       return
     }
     
+    // Shopify requires shop domain
+    if (platform === 'SHOPIFY') {
+      setShowShopifyForm(true)
+      return
+    }
+    
+    // TikTok and Etsy use direct OAuth
     try {
       const platformLower = platform.toLowerCase()
       const res = await fetch(`/api/auth/connect/${platformLower}`, {
@@ -604,6 +614,100 @@ export default function StoresPageContent() {
                 className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600"
               >
                 {bcConnecting ? "Connecting..." : "Connect Store"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Shopify Shop Domain Form */}
+      {showShopifyForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowShopifyForm(false)}>
+          <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle>Connect Shopify Store</CardTitle>
+              <CardDescription>
+                Enter your Shopify store domain to connect
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Shopify Store Domain</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-md"
+                  placeholder="my-store.myshopify.com"
+                  value={shopifyShop}
+                  onChange={(e) => setShopifyShop(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter your full Shopify domain (e.g., my-store.myshopify.com)
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs text-blue-900">
+                  <strong>Note:</strong> You'll be redirected to Shopify to authorize access to your store.
+                  Make sure Shopify OAuth credentials are configured in Admin → System Settings.
+                </p>
+              </div>
+            </CardContent>
+            <div className="p-4 border-t flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowShopifyForm(false)
+                  setShopifyShop('')
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!shopifyShop) {
+                    toast({
+                      title: "Missing Information",
+                      description: "Please enter your Shopify store domain",
+                      variant: "destructive"
+                    })
+                    return
+                  }
+                  
+                  setShopifyConnecting(true)
+                  try {
+                    const res = await fetch('/api/auth/connect/shopify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ shop: shopifyShop })
+                    })
+                    
+                    const data = await res.json()
+                    
+                    if (res.ok && data.authUrl) {
+                      // Redirect to Shopify OAuth
+                      window.location.href = data.authUrl
+                    } else {
+                      toast({
+                        title: "Connection Failed",
+                        description: data.error || "Failed to connect Shopify store. Make sure OAuth credentials are configured in Admin → System Settings.",
+                        variant: "destructive"
+                      })
+                      setShopifyConnecting(false)
+                    }
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to connect store",
+                      variant: "destructive"
+                    })
+                    setShopifyConnecting(false)
+                  }
+                }}
+                disabled={shopifyConnecting}
+                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600"
+              >
+                {shopifyConnecting ? "Connecting..." : "Connect to Shopify"}
               </Button>
             </div>
           </Card>
