@@ -684,24 +684,9 @@ export default function StoresPageContent() {
                     
                     const data = await res.json()
                     
-                    // Debug: Always log the response
-                    console.log('Shopify connect response:', data)
-                    
                     if (res.ok && data.authUrl) {
-                      // Show the URL in a copyable way
-                      const urlText = data.authUrl
-                      const tempInput = document.createElement('textarea')
-                      tempInput.value = urlText
-                      document.body.appendChild(tempInput)
-                      tempInput.select()
-                      document.execCommand('copy')
-                      document.body.removeChild(tempInput)
-                      
-                      const proceed = confirm(`OAuth URL copied to clipboard!\n\nURL: ${urlText.substring(0, 100)}...\n\nClick OK to redirect to Shopify, or Cancel to stay here and paste the URL.`)
-                      
-                      if (proceed) {
-                        window.location.href = data.authUrl
-                      }
+                      // Redirect to Shopify OAuth
+                      window.location.href = data.authUrl
                     } else {
                       toast({
                         title: "Connection Failed",
