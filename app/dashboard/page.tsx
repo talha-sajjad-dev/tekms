@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [usage, setUsage] = useState<UsageSummary | null>(null)
+  const [storeCount, setStoreCount] = useState(0)
   const [loadingUsage, setLoadingUsage] = useState(true)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export default function DashboardPage() {
       router.push("/")
     } else if (status === "authenticated") {
       fetchUsage()
+      fetchStoreCount()
     }
   }, [status, router])
 
@@ -65,6 +67,18 @@ export default function DashboardPage() {
       console.error("Failed to fetch usage:", error)
     } finally {
       setLoadingUsage(false)
+    }
+  }
+
+  const fetchStoreCount = async () => {
+    try {
+      const res = await fetch("/api/stores")
+      if (res.ok) {
+        const data = await res.json()
+        setStoreCount(data.stores?.length || 0)
+      }
+    } catch (error) {
+      console.error("Failed to fetch stores:", error)
     }
   }
 
@@ -148,13 +162,13 @@ export default function DashboardPage() {
             <CardHeader className="pb-2">
               <CardDescription>Connected Stores</CardDescription>
               <CardTitle className="text-3xl font-bold text-gray-900">
-                {loadingUsage ? "..." : Object.keys(usage?.platformBreakdown || {}).length}
+                {loadingUsage ? "..." : storeCount}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-gray-700 font-medium">
-                {Object.keys(usage?.platformBreakdown || {}).length > 0
-                  ? "Active connections"
+                {storeCount > 0
+                  ? `${storeCount} active connection${storeCount !== 1 ? 's' : ''}`
                   : "No stores connected yet"}
               </p>
             </CardContent>

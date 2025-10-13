@@ -480,28 +480,12 @@ export default function StoresPageContent() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex-1 text-xs h-7"
-                              onClick={() => router.push(`/stores/${store.id}`)}
-                            >
-                              Manage
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2"
-                              onClick={() => handleSync(store.id)}
-                              title="Sync products"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-destructive hover:text-destructive"
+                              className="flex-1 text-xs h-7 text-destructive hover:text-destructive border-destructive/30"
                               onClick={() => setDisconnectId(store.id)}
                               title="Disconnect store"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Disconnect
                             </Button>
                           </div>
                         </CardContent>
