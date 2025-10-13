@@ -12,11 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { 
-  ArrowLeft, 
-  Save, 
-  Upload, 
-  Globe, 
+import { ImageUpload } from "@/components/admin/ImageUpload"
+import {
+  ArrowLeft,
+  Save,
+  Globe,
   Image as ImageIcon,
   FileText,
   Link as LinkIcon,
@@ -379,50 +379,29 @@ export default function WebsiteSettingsPage() {
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="logo-url">Website Logo URL</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="logo-url"
-                      value={settings['website.logo_url'] || ''}
-                      onChange={(e) => updateSetting('website.logo_url', e.target.value)}
-                      placeholder="/logo.png"
-                    />
-                    <Button variant="outline" disabled>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload
-                    </Button>
-                  </div>
-                  {settings['website.logo_url'] && (
-                    <div className="mt-2 p-4 border rounded-lg bg-gray-50">
-                      <p className="text-xs text-muted-foreground mb-2">Preview:</p>
-                      <img 
-                        src={settings['website.logo_url']} 
-                        alt="Logo preview" 
-                        className="h-12 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.src = '/placeholder-logo.svg'
-                        }}
-                      />
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Upload feature coming soon. For now, place logo in /public folder and enter the path
-                  </p>
-                </div>
+                <ImageUpload
+                  label="Website Logo"
+                  value={settings['website.logo_url'] || ''}
+                  onChange={(url) => updateSetting('website.logo_url', url)}
+                  category="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  maxSizeMB={2}
+                  showPreview={true}
+                  placeholder="/logo.png"
+                  description="Upload PNG, SVG, JPEG, or WebP. Max 2MB. Recommended: transparent background PNG or SVG"
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="favicon-url">Favicon URL</Label>
-                  <Input
-                    id="favicon-url"
-                    value={settings['website.favicon_url'] || ''}
-                    onChange={(e) => updateSetting('website.favicon_url', e.target.value)}
-                    placeholder="/favicon.ico"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Browser tab icon (16x16 or 32x32 pixels)
-                  </p>
-                </div>
+                <ImageUpload
+                  label="Favicon"
+                  value={settings['website.favicon_url'] || ''}
+                  onChange={(url) => updateSetting('website.favicon_url', url)}
+                  category="branding"
+                  accept="image/x-icon,image/vnd.microsoft.icon,image/png"
+                  maxSizeMB={1}
+                  showPreview={true}
+                  placeholder="/favicon.ico"
+                  description="Browser tab icon. Upload ICO or PNG (16x16 or 32x32 pixels recommended)"
+                />
 
                 <Button 
                   onClick={handleSaveSettings} 
