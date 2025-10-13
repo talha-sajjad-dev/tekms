@@ -101,8 +101,6 @@ export default function ProductsPage() {
   const [showTagDialog, setShowTagDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
-  const [showSyncPreview, setShowSyncPreview] = useState(false)
-  const [syncPreviewData, setSyncPreviewData] = useState<any>(null)
   const [bulkOperating, setBulkOperating] = useState(false)
   const [syncing, setSyncing] = useState(false)
   
@@ -289,31 +287,9 @@ export default function ProductsPage() {
     setShowSyncDialog(false)
     setSyncing(true)
     try {
-      const res = await fetch(`/api/stores/${storeId}/preview`)
-      const data = await res.json()
+      toast({ title: 'Syncing...', description: 'Fetching products from BigCommerce. This may take a few minutes...' })
       
-      if (res.ok) {
-        setSyncPreviewData({...data, storeId})
-        setShowSyncPreview(true)
-      } else {
-        toast({ title: 'Error', description: 'Failed to preview sync', variant: 'destructive' })
-      }
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to preview sync', variant: 'destructive' })
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const handleConfirmSync = async () => {
-    if (!syncPreviewData) return
-    
-    setShowSyncPreview(false)
-    setSyncing(true)
-    try {
-      toast({ title: 'Syncing...', description: 'Please wait while we sync your products' })
-      
-      const res = await fetch(`/api/stores/${syncPreviewData.storeId}/sync`, {
+      const res = await fetch(`/api/stores/${storeId}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ background: false })
@@ -321,15 +297,27 @@ export default function ProductsPage() {
 
       const data = await res.json()
       if (res.ok) {
-        toast({ title: 'Sync Complete', description: `Synced ${data.productCount || 0} products` })
+        toast({
+          title: 'Sync Complete! ✅',
+          description: `Successfully synced ${data.productCount || 0} products from BigCommerce`,
+          duration: 5000
+        })
         fetchStores()
         fetchProducts()
-        setSyncPreviewData(null)
       } else {
-        toast({ title: 'Sync Failed', description: data.error || 'Failed to sync', variant: 'destructive' })
+        toast({
+          title: 'Sync Failed',
+          description: data.error || 'Failed to sync products. Please try again.',
+          variant: 'destructive',
+          duration: 7000
+        })
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to sync', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'Network error while syncing. Please check your connection.',
+        variant: 'destructive'
+      })
     } finally {
       setSyncing(false)
     }
@@ -1014,135 +1002,6 @@ export default function ProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Sync Preview Dialog */}
-      <Dialog open={showSyncPreview} onOpenChange={setShowSyncPreview}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sync Preview - {syncPreviewData?.storeName}</DialogTitle>
-            <DialogDescription>
-              Review what will be synced and pricing implications
-            </DialogDescription>
-          </DialogHeader>
-          
-          {syncPreviewData && (
-            <div className="space-y-4 py-4">
-              {/* Product Summary */}
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <div className="text-sm font-semibold mb-2">📦 Store: {syncPreviewData.storeName}</div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Products in {syncPreviewData.platform}:</span>
-                    <span className="font-semibold">{syncPreviewData.platformProductCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Currently synced:</span>
-                    <span className="font-semibold">{syncPreviewData.currentStoreProducts || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Platform Access Check */}
-              {syncPreviewData.needsUserUpgrade && (
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="font-semibold text-red-900 mb-2">🚫 Platform Not Available</div>
-                  <div className="text-sm text-red-800">
-                    Your <strong>{syncPreviewData.userTier}</strong> plan doesn't include {syncPreviewData.platform} access.
-                    Upgrade to PAID to access all platforms.
-                  </div>
-                </div>
-              )}
-
-              {/* Per-Store Pricing */}
-              {!syncPreviewData.needsUserUpgrade && syncPreviewData.requiredTier && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                  <div className="font-semibold mb-2">💰 Store Billing (Per-Store Pricing)</div>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">
-                      This store will be billed separately based on its product count:
-                    </p>
-                    <div className="p-3 bg-white rounded border">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-semibold">{syncPreviewData.requiredTier.name}</div>
-                        <Badge variant="secondary">{syncPreviewData.newStoreTotal} products</Badge>
-                      </div>
-                      <div className="text-muted-foreground text-xs mb-2">
-                        {syncPreviewData.requiredTier.minProducts} - {
-                          syncPreviewData.requiredTier.maxProducts === -1
-                            ? 'Unlimited'
-                            : syncPreviewData.requiredTier.maxProducts
-                        } products per store
-                      </div>
-                      <div className="text-2xl font-bold text-green-600">
-                        ${syncPreviewData.requiredTier.monthlyPrice}
-                        <span className="text-sm font-normal text-muted-foreground">/month</span>
-                      </div>
-                      {syncPreviewData.requiredTier.yearlyPrice && (
-                        <div className="text-xs text-green-600 mt-1">
-                          ${syncPreviewData.requiredTier.yearlyPrice}/year (save{' '}
-                          {Math.round((1 - (syncPreviewData.requiredTier.yearlyPrice / (syncPreviewData.requiredTier.monthlyPrice * 12))) * 100)}%)
-                        </div>
-                      )}
-                    </div>
-                    {syncPreviewData.currentStoreTier && (
-                      <p className="text-xs text-muted-foreground">
-                        Current tier: {syncPreviewData.currentStoreTier.name} (${syncPreviewData.currentStoreTier.price}/mo)
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {!syncPreviewData.needsUserUpgrade && !syncPreviewData.needsStoreUpgrade && (
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="flex items-center gap-2 text-green-900">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <div>
-                      <div className="font-semibold">Ready to Sync!</div>
-                      <div className="text-sm text-green-800">
-                        This store's current tier supports {syncPreviewData.newStoreTotal} products.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSyncPreview(false)}>
-              Cancel
-            </Button>
-            {syncPreviewData?.needsUserUpgrade ? (
-              <Button
-                className="bg-gradient-to-r from-blue-600 to-cyan-600"
-                onClick={() => {
-                  setShowSyncPreview(false)
-                  router.push('/billing')
-                }}
-              >
-                Upgrade to Access {syncPreviewData.platform}
-              </Button>
-            ) : syncPreviewData?.needsStoreUpgrade ? (
-              <Button
-                className="bg-gradient-to-r from-green-600 to-emerald-600"
-                onClick={() => {
-                  setShowSyncPreview(false)
-                  router.push('/billing')
-                }}
-              >
-                Subscribe ${syncPreviewData.requiredTier?.monthlyPrice}/mo for This Store
-              </Button>
-            ) : (
-              <Button
-                className="bg-gradient-to-r from-blue-600 to-cyan-600"
-                onClick={handleConfirmSync}
-              >
-                Sync {syncPreviewData?.platformProductCount} Products
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
