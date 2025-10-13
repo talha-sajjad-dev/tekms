@@ -483,7 +483,7 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
             sku: bcProduct.sku || null,
             price: bcProduct.price || 0,
             compareAtPrice: bcProduct.retail_price || null,
-            categories: bcProduct.categories || [],
+            categories: (bcProduct.categories || []).map((c: number) => c.toString()),
             tags: [],
             images: bcProduct.images ? { images: bcProduct.images } : undefined,
             variants: bcProduct.variants ? { variants: bcProduct.variants } : undefined,
