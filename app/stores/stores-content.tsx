@@ -41,10 +41,58 @@ interface StoreConnection {
 }
 
 const PLATFORMS = [
-  { value: "SHOPIFY", label: "Shopify", color: "bg-green-500", icon: "🟢" },
-  { value: "ETSY", label: "Etsy", color: "bg-orange-500", icon: "🟠" },
-  { value: "BIGCOMMERCE", label: "BigCommerce", color: "bg-blue-500", icon: "🔵" },
-  { value: "TIKTOK", label: "TikTok Shop", color: "bg-pink-500", icon: "🎵" },
+  {
+    value: "BIGCOMMERCE",
+    label: "BigCommerce",
+    color: "bg-blue-500",
+    textColor: "text-blue-600",
+    hoverColor: "hover:border-blue-400",
+    logo: (
+      <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+      </svg>
+    ),
+    isComingSoon: false
+  },
+  {
+    value: "SHOPIFY",
+    label: "Shopify",
+    color: "bg-green-500",
+    textColor: "text-green-600",
+    hoverColor: "hover:border-green-400",
+    logo: (
+      <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M14.8 7.1c-.1-.6-.5-.9-1-.9-.5 0-1.5.2-2.4.6-.3-1-.8-1.8-1.4-2.4-.9-.9-2-1.3-3.1-1.3h-.2c-.2-.2-.4-.3-.7-.3-.5 0-1 .4-1.1 1.1L3.5 13.4c-.1.4.2.8.6.8h4.1l2-12.1c.1-.5.5-.9 1-.9h.1c1.1 0 2 .9 2 2v.1c-.9.3-1.7.8-2.4 1.4-.6.6-1 1.4-1 2.3 0 1.8 1.5 3.3 3.3 3.3.7 0 1.4-.2 2-.7.5-.4.9-1 1-1.7l.1-.7z"/>
+      </svg>
+    ),
+    isComingSoon: true
+  },
+  {
+    value: "ETSY",
+    label: "Etsy",
+    color: "bg-orange-500",
+    textColor: "text-orange-600",
+    hoverColor: "hover:border-orange-400",
+    logo: (
+      <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+      </svg>
+    ),
+    isComingSoon: false
+  },
+  {
+    value: "TIKTOK",
+    label: "TikTok Shop",
+    color: "bg-pink-500",
+    textColor: "text-pink-600",
+    hoverColor: "hover:border-pink-400",
+    logo: (
+      <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+      </svg>
+    ),
+    isComingSoon: false
+  },
 ]
 
 export default function StoresPageContent() {
@@ -224,24 +272,48 @@ export default function StoresPageContent() {
     return messages[error] || error.replace(/_/g, ' ')
   }
 
-  const handleConnectPlatform = async (platform: string) => {
+  const handleConnectPlatform = async (platformValue: string) => {
+    const platform = PLATFORMS.find(p => p.value === platformValue)
+    
+    // Check if platform is coming soon (Shopify)
+    if (platform?.isComingSoon) {
+      // Check if user is admin
+      const isAdmin = session?.user?.role === 'ADMIN'
+      
+      if (!isAdmin) {
+        toast({
+          title: "Coming Soon! 🚀",
+          description: `${platform.label} integration is currently under development. We're working hard to bring it to you soon!`,
+          duration: 5000,
+        })
+        setShowConnectModal(false)
+        return
+      } else {
+        toast({
+          title: "Admin Access",
+          description: `You can connect ${platform.label} for testing purposes.`,
+          duration: 3000,
+        })
+      }
+    }
+    
     setShowConnectModal(false)
     
     // BigCommerce requires manual credentials
-    if (platform === 'BIGCOMMERCE') {
+    if (platformValue === 'BIGCOMMERCE') {
       setShowBigCommerceForm(true)
       return
     }
     
     // Shopify requires shop domain
-    if (platform === 'SHOPIFY') {
+    if (platformValue === 'SHOPIFY') {
       setShowShopifyForm(true)
       return
     }
     
     // TikTok and Etsy use direct OAuth
     try {
-      const platformLower = platform.toLowerCase()
+      const platformLower = platformValue.toLowerCase()
       const res = await fetch(`/api/auth/connect/${platformLower}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,7 +327,7 @@ export default function StoresPageContent() {
       } else {
         toast({
           title: "Connection Failed",
-          description: data.error || `Failed to initiate ${PLATFORMS.find(p => p.value === platform)?.label} connection. Make sure OAuth credentials are configured in Admin → System Settings.`,
+          description: data.error || `Failed to initiate ${PLATFORMS.find(p => p.value === platformValue)?.label} connection. Make sure OAuth credentials are configured in Admin → System Settings.`,
           variant: "destructive",
         })
       }
@@ -352,9 +424,9 @@ export default function StoresPageContent() {
               <div key={platform.value}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <span className="text-2xl">{platform.icon}</span>
-                    {platform.label}
-                  </h2>
+                   <span className={platform.textColor}>{platform.logo}</span>
+                   {platform.label}
+                 </h2>
                   {platform.stores.length === 0 && (
                     <Button
                       variant="outline"
@@ -381,8 +453,10 @@ export default function StoresPageContent() {
                       <Card key={store.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-8 h-8 rounded ${platform.color} flex items-center justify-center text-lg`}>
-                              {platform.icon}
+                            <div className={`w-8 h-8 rounded ${platform.color} flex items-center justify-center ${platform.textColor}`}>
+                              <div className="scale-75">
+                                {platform.logo}
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-sm truncate">{store.storeName}</h3>
@@ -476,11 +550,25 @@ export default function StoresPageContent() {
                 <Button
                   key={platform.value}
                   variant="outline"
-                  className="h-24 flex flex-col gap-2 hover:border-primary"
+                  className={`relative h-32 flex flex-col gap-3 ${platform.hoverColor} transition-all duration-200`}
                   onClick={() => handleConnectPlatform(platform.value)}
                 >
-                  <span className="text-3xl">{platform.icon}</span>
-                  <span>{platform.label}</span>
+                  {platform.isComingSoon && (
+                    <div className="absolute top-2 right-2">
+                      <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  )}
+                  <div className={platform.textColor}>
+                    {platform.logo}
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-semibold">{platform.label}</span>
+                    {platform.isComingSoon && (
+                      <span className="text-xs text-muted-foreground">Under Development</span>
+                    )}
+                  </div>
                 </Button>
               ))}
             </CardContent>
