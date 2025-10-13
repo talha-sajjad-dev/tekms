@@ -118,19 +118,19 @@ export default function DashboardPage() {
   const isAdmin = session.user?.role === 'ADMIN'
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-white md:bg-gradient-to-br md:from-slate-50 md:to-blue-50">
       {/* Header */}
-      <header className="border-b bg-white/50 backdrop-blur-sm">
+      <header className="border-b bg-white backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Package className="h-8 w-8 text-blue-600" />
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                  <h1 className="text-2xl font-bold text-gray-900">
                     TEKMS Dashboard
                   </h1>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-700">
                     Welcome back, {session.user?.name || session.user?.email}
                   </p>
                 </div>
@@ -144,15 +144,15 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Stats Overview */}
         <div className="grid md:grid-cols-2 gap-4 mb-8">
-          <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
+          <Card className="border-gray-200 bg-white">
             <CardHeader className="pb-2">
               <CardDescription>Connected Stores</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">
+              <CardTitle className="text-3xl font-bold text-gray-900">
                 {loadingUsage ? "..." : Object.keys(usage?.platformBreakdown || {}).length}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-700 font-medium">
                 {Object.keys(usage?.platformBreakdown || {}).length > 0
                   ? "Active connections"
                   : "No stores connected yet"}
@@ -160,13 +160,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
           
-          <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
+          <Card className="border-gray-200 bg-white">
             <CardHeader className="pb-2">
               <CardDescription>Subscription</CardDescription>
               <CardTitle className="text-2xl">
                 <Badge
                   variant={usage?.tier === "FREE" ? "secondary" : "default"}
-                  className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold"
                 >
                   {loadingUsage ? "..." : usage?.tier || "Free"}
                 </Badge>
@@ -189,9 +189,9 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold mb-4 text-gray-900">Quick Actions</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickActions.map((action, index) => (
-              <Card 
+              <Card
                 key={index}
-                className={`hover:shadow-lg transition-all cursor-pointer border-blue-100 bg-white/80 backdrop-blur-sm ${
+                className={`hover:shadow-lg transition-all cursor-pointer border-gray-200 bg-white ${
                   action.highlight ? 'ring-2 ring-blue-500 ring-offset-2' : ''
                 }`}
                 onClick={() => router.push(action.href)}
@@ -199,12 +199,12 @@ export default function DashboardPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className={`p-3 rounded-lg ${
-                      action.highlight 
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600' 
+                      action.highlight
+                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 shadow-md'
                         : 'bg-blue-100'
                     }`}>
                       <action.icon className={`h-6 w-6 ${
-                        action.highlight ? 'text-white' : 'text-blue-600'
+                        action.highlight ? 'text-white' : 'text-blue-700'
                       }`} />
                     </div>
                     {action.badge && (
@@ -213,8 +213,8 @@ export default function DashboardPage() {
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="text-lg mt-4">{action.title}</CardTitle>
-                  <CardDescription className="text-sm">
+                  <CardTitle className="text-lg mt-4 text-gray-900 font-semibold">{action.title}</CardTitle>
+                  <CardDescription className="text-sm text-gray-700">
                     {action.description}
                   </CardDescription>
                 </CardHeader>
@@ -247,8 +247,8 @@ export default function DashboardPage() {
                 </CardHeader>
               </Card>
               
-              <Card 
-                className="hover:shadow-lg transition-all cursor-pointer border-orange-100 bg-white/80"
+              <Card
+                className="hover:shadow-lg transition-all cursor-pointer border-gray-200 bg-white"
                 onClick={() => router.push("/credentials")}
               >
                 <CardHeader>
@@ -266,7 +266,7 @@ export default function DashboardPage() {
         )}
 
         {/* Getting Started */}
-        <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
+        <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="text-gray-900">Getting Started</CardTitle>
             <CardDescription>
@@ -280,7 +280,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1 text-gray-900">Connect Your Stores</h3>
-                <p className="text-sm text-gray-600 mb-3">
+                <p className="text-sm text-gray-800 mb-3 font-medium">
                   Connect your Shopify, Etsy, BigCommerce, or TikTok Shop with one click
                 </p>
                 <Button 
@@ -299,7 +299,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1 text-gray-900">Choose Your Plan</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-800 font-medium">
                   Select a subscription plan based on your store's product count
                 </p>
               </div>
@@ -311,7 +311,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1 text-gray-900">Sync & Manage Products</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-800 font-medium">
                   Automatically sync products and manage listings across all platforms
                 </p>
               </div>
