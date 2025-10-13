@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { SuccessToast } from "@/components/ui/success-toast"
 import { ImageUpload } from "@/components/admin/ImageUpload"
 import {
   ArrowLeft,
@@ -55,6 +56,8 @@ export default function WebsiteSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<Record<string, string>>({})
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   
   // Page Management State
   const [pages, setPages] = useState<Page[]>([])
@@ -148,10 +151,11 @@ export default function WebsiteSettingsPage() {
       const data = await res.json()
 
       if (res.ok) {
+        setSuccessMessage(`Settings saved successfully! Updated ${data.successCount} settings in database.`)
+        setShowSuccess(true)
         toast({
-          title: "✅ Settings Saved to Database!",
-          description: `Successfully updated ${data.successCount} settings in the database. Changes are now live.`,
-          duration: 5000
+          title: "Settings Saved",
+          description: `Successfully updated ${data.successCount} settings`
         })
       } else {
         toast({
@@ -276,7 +280,14 @@ export default function WebsiteSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      {showSuccess && (
+        <SuccessToast
+          message={successMessage}
+          onClose={() => setShowSuccess(false)}
+        />
+      )}
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
@@ -889,5 +900,6 @@ export default function WebsiteSettingsPage() {
         </Tabs>
       </div>
     </div>
+    </>
   )
 }

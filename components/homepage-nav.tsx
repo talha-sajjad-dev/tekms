@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -21,6 +22,23 @@ interface HomepageNavProps {
 export function HomepageNav({ onSignInClick }: HomepageNavProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [settings, setSettings] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings/public')
+      const data = await res.json()
+      if (res.ok) {
+        setSettings(data.settings || {})
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error)
+    }
+  }
 
   const getInitials = (name?: string | null) => {
     if (!name) return "U"
@@ -32,14 +50,28 @@ export function HomepageNav({ onSignInClick }: HomepageNavProps) {
       .slice(0, 2)
   }
 
+  const siteName = settings['website.name'] || 'TEKMS'
+  const logoUrl = settings['website.logo_url']
+
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push("/")}>
-            <Package className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">TEKMS</span>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={siteName}
+                className="h-8 w-auto"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                }}
+              />
+            ) : null}
+            {!logoUrl && <Package className="h-8 w-8 text-primary" />}
+            <span className="text-xl font-bold">{siteName}</span>
           </div>
 
           {/* Navigation */}

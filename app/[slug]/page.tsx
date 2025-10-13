@@ -14,9 +14,10 @@ export async function generateStaticParams() {
   }))
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const page = await db.page.findUnique({
-    where: { slug: params.slug, isPublished: true }
+    where: { slug, isPublished: true }
   })
   
   if (!page) return {}
@@ -27,9 +28,10 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function DynamicPage({ params }: { params: { slug: string } }) {
+export default async function DynamicPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const page = await db.page.findUnique({
-    where: { slug: params.slug }
+    where: { slug }
   })
   
   if (!page || !page.isPublished) {
