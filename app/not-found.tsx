@@ -69,15 +69,12 @@ export default function NotFound() {
             </Button>
             
             <Button
-              asChild
               variant="outline"
               className="flex-1"
               onClick={() => window.history.back()}
             >
-              <button>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Go Back
-              </button>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Go Back
             </Button>
           </div>
 
