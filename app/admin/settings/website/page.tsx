@@ -149,14 +149,16 @@ export default function WebsiteSettingsPage() {
 
       if (res.ok) {
         toast({
-          title: "Settings Saved!",
-          description: `Updated ${data.successCount} settings successfully`
+          title: "✅ Settings Saved to Database!",
+          description: `Successfully updated ${data.successCount} settings in the database. Changes are now live.`,
+          duration: 5000
         })
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to save settings",
-          variant: "destructive"
+          title: "❌ Database Save Failed",
+          description: data.error || "Failed to save settings to database. Please try again.",
+          variant: "destructive",
+          duration: 7000
         })
       }
     } catch (error) {
@@ -426,61 +428,53 @@ export default function WebsiteSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>BigCommerce Icon</Label>
-                    <Textarea
-                      value={settings['platform.bigcommerce_icon'] || ''}
-                      onChange={(e) => updateSetting('platform.bigcommerce_icon', e.target.value)}
-                      placeholder='<svg viewBox="0 0 24 24">...</svg>'
-                      rows={4}
-                      className="font-mono text-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Paste SVG code or leave empty for default
-                    </p>
-                  </div>
+                  <ImageUpload
+                    label="BigCommerce Icon"
+                    value={settings['platform.bigcommerce_icon'] || ''}
+                    onChange={(url) => updateSetting('platform.bigcommerce_icon', url)}
+                    category="icons"
+                    accept="image/svg+xml,image/png,image/jpeg"
+                    maxSizeMB={1}
+                    showPreview={true}
+                    placeholder="/icons/bigcommerce.svg"
+                    description="Upload SVG or PNG icon for BigCommerce (leave empty for default)"
+                  />
 
-                  <div className="space-y-2">
-                    <Label>Shopify Icon</Label>
-                    <Textarea
-                      value={settings['platform.shopify_icon'] || ''}
-                      onChange={(e) => updateSetting('platform.shopify_icon', e.target.value)}
-                      placeholder='<svg viewBox="0 0 24 24">...</svg>'
-                      rows={4}
-                      className="font-mono text-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Paste SVG code or leave empty for default
-                    </p>
-                  </div>
+                  <ImageUpload
+                    label="Shopify Icon"
+                    value={settings['platform.shopify_icon'] || ''}
+                    onChange={(url) => updateSetting('platform.shopify_icon', url)}
+                    category="icons"
+                    accept="image/svg+xml,image/png,image/jpeg"
+                    maxSizeMB={1}
+                    showPreview={true}
+                    placeholder="/icons/shopify.svg"
+                    description="Upload SVG or PNG icon for Shopify (leave empty for default)"
+                  />
 
-                  <div className="space-y-2">
-                    <Label>Etsy Icon</Label>
-                    <Textarea
-                      value={settings['platform.etsy_icon'] || ''}
-                      onChange={(e) => updateSetting('platform.etsy_icon', e.target.value)}
-                      placeholder='<svg viewBox="0 0 24 24">...</svg>'
-                      rows={4}
-                      className="font-mono text-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Paste SVG code or leave empty for default
-                    </p>
-                  </div>
+                  <ImageUpload
+                    label="Etsy Icon"
+                    value={settings['platform.etsy_icon'] || ''}
+                    onChange={(url) => updateSetting('platform.etsy_icon', url)}
+                    category="icons"
+                    accept="image/svg+xml,image/png,image/jpeg"
+                    maxSizeMB={1}
+                    showPreview={true}
+                    placeholder="/icons/etsy.svg"
+                    description="Upload SVG or PNG icon for Etsy (leave empty for default)"
+                  />
 
-                  <div className="space-y-2">
-                    <Label>TikTok Icon</Label>
-                    <Textarea
-                      value={settings['platform.tiktok_icon'] || ''}
-                      onChange={(e) => updateSetting('platform.tiktok_icon', e.target.value)}
-                      placeholder='<svg viewBox="0 0 24 24">...</svg>'
-                      rows={4}
-                      className="font-mono text-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Paste SVG code or leave empty for default
-                    </p>
-                  </div>
+                  <ImageUpload
+                    label="TikTok Icon"
+                    value={settings['platform.tiktok_icon'] || ''}
+                    onChange={(url) => updateSetting('platform.tiktok_icon', url)}
+                    category="icons"
+                    accept="image/svg+xml,image/png,image/jpeg"
+                    maxSizeMB={1}
+                    showPreview={true}
+                    placeholder="/icons/tiktok.svg"
+                    description="Upload SVG or PNG icon for TikTok (leave empty for default)"
+                  />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
