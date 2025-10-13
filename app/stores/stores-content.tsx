@@ -378,7 +378,7 @@ export default function StoresPageContent() {
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {platform.stores.map((store) => (
-                      <Card key={store.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setDisconnectId(store.id)}>
+                      <Card key={store.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <div className={`w-8 h-8 rounded ${platform.color} flex items-center justify-center text-lg`}>
@@ -388,7 +388,7 @@ export default function StoresPageContent() {
                               <h3 className="font-semibold text-sm truncate">{store.storeName}</h3>
                             </div>
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1 mb-3">
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-muted-foreground">Products</span>
                               <span className="font-medium">{store.productCount}</span>
@@ -396,6 +396,39 @@ export default function StoresPageContent() {
                             <div className="flex items-center gap-1">
                               {getStatusBadge(store.syncStatus, store.isActive)}
                             </div>
+                            {store.lastSyncedAt && (
+                              <div className="text-xs text-muted-foreground">
+                                Synced {formatDate(store.lastSyncedAt)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-xs h-7"
+                              onClick={() => router.push(`/stores/${store.id}`)}
+                            >
+                              Manage
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2"
+                              onClick={() => handleSync(store.id)}
+                              title="Sync products"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-destructive hover:text-destructive"
+                              onClick={() => setDisconnectId(store.id)}
+                              title="Disconnect store"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>

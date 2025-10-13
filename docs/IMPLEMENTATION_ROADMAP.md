@@ -1,638 +1,511 @@
-# Implementation Roadmap - Store Connector System
+# Implementation Roadmap: Missing Features
 
-## Overview
-
-This roadmap outlines the step-by-step implementation of the hybrid OAuth + Legacy architecture for TEKMS Listing Manager.
-
----
-
-## Phase 1: Database Foundation (Week 1)
-
-### 1.1 Update Prisma Schema ✅ Ready to Implement
-
-**File:** `prisma/schema.prisma`
-
-**Changes:**
-1. Add legacy permission fields to User model:
-   ```prisma
-   allowLegacyEtsyImport  Boolean @default(false)
-   allowLegacyTikTokExport Boolean @default(false)
-   ```
-
-2. Create StoreConnection model (full schema in HYBRID_ARCHITECTURE_PLAN.md)
-
-3. Update Product model:
-   ```prisma
-   storeConnectionId  String?
-   importMethod       String @default("oauth") // "oauth" or "legacy"
-   ```
-
-4. Add isLegacy field to UserCredential model
-
-**Commands:**
-```bash
-# Create migration
-npx prisma migrate dev --name add-store-connections
-
-# Generate Prisma client
-npx prisma generate
-```
-
-### 1.2 Seed Legacy Permissions
-
-**File:** `prisma/seed-legacy-permissions.ts`
-
-Grant admin users legacy feature access:
-```typescript
-await db.user.updateMany({
-  where: { role: 'ADMIN' },
-  data: {
-    allowLegacyEtsyImport: true,
-    allowLegacyTikTokExport: true,
-  }
-})
-```
+**Created**: 2025-10-13  
+**Based on**: Comprehensive Gap Analysis  
+**Current Coverage**: 50% of full scope
 
 ---
 
-## Phase 2: Permission System (Week 1)
+## Quick Summary
 
-### 2.1 Permission Helpers
+Your system has a **solid foundation** with:
+- ✅ Multi-platform OAuth sync (4 platforms)
+- ✅ Basic product CRUD operations
+- ✅ Per-store billing with preview
+- ✅ Background job queue
+- ✅ Basic bulk operations
+- ✅ Search and filters
 
-**File:** `lib/auth/permissions.ts`
-
-Functions to implement:
-- `canUseLegacyEtsyImport(userId)` → boolean
-- `canUseLegacyTikTokExport(userId)` → boolean  
-- `canConnectStore(userId, platform)` → { allowed, reason? }
-- `getStoreConnectionLimit(tier)` → number
-
-### 2.2 Update Legacy Route Protection
-
-**Files to update:**
-- `app/api/etsy/import/route.ts`
-- `app/api/tiktok/export/route.ts`
-
-Add permission checks at the start of each route:
-```typescript
-const hasPermission = await canUseLegacyEtsyImport(session.user.id)
-if (!hasPermission) {
-  return NextResponse.json(
-    { error: 'Permission required', useStoreConnections: true },
-    { status: 403 }
-  )
-}
-```
-
-### 2.3 Update Legacy Page Components
-
-**Files to update:**
-- `app/etsy-import/page.tsx`
-- `app/tiktok-export/page.tsx`
-
-Add permission checks and upgrade prompts for unauthorized users.
+**What's Missing** (ordered by business impact):
 
 ---
 
-## Phase 3: OAuth Infrastructure (Week 2)
+## 🎯 Recommended Priorities
 
-### 3.1 Environment Variables Setup
+### Option A: E-Commerce Business Focus (Most Common)
+**Goal**: Get products listed and selling ASAP
 
-**File:** `.env`
+1. **CSV/XLSX Import** (5 days) - Bulk add thousands of products
+2. **Channel Validation** (3 days) - Ensure products meet platform requirements
+3. **Pricing Engine** (5 days) - Automated pricing rules
+4. **Inventory Sync** (7 days) - Prevent overselling
+5. **Performance Analytics** (5 days) - Track what's selling
 
-Add OAuth credentials:
-```bash
-# Shopify OAuth
-SHOPIFY_CLIENT_ID="your_shopify_api_key"
-SHOPIFY_CLIENT_SECRET="your_shopify_api_secret"
-SHOPIFY_REDIRECT_URI="https://yourdomain.com/api/auth/callback/shopify"
+**Total**: 25 days (~5 weeks)
 
-# Etsy OAuth
-ETSY_CLIENT_ID="your_etsy_client_id"
-ETSY_CLIENT_SECRET="your_etsy_client_secret"
-ETSY_REDIRECT_URI="https://yourdomain.com/api/auth/callback/etsy"
+### Option B: Automation Focus
+**Goal**: Minimize manual work with rules and AI
 
-# BigCommerce (optional)
-BIGCOMMERCE_CLIENT_ID="your_bc_client_id"
-BIGCOMMERCE_CLIENT_SECRET="your_bc_client_secret"
+1. **Rules Builder** (10 days) - No-code automation
+2. **AI Content Generation** (7 days) - Auto-generate titles/descriptions
+3. **Scheduled Operations** (5 days) - Midnight syncs, auto-pricing
+4. **Pricing Engine** (5 days) - Dynamic pricing formulas
+5. **Dead-Letter Queue** (3 days) - Handle failures automatically
 
-# TikTok OAuth
-TIKTOK_CLIENT_KEY="your_tiktok_client_key"
-TIKTOK_CLIENT_SECRET="your_tiktok_client_secret"
-TIKTOK_REDIRECT_URI="https://yourdomain.com/api/auth/callback/tiktok"
-```
+**Total**: 30 days (~6 weeks)
 
-### 3.2 Platform OAuth Adapters
+### Option C: Team/Agency Focus
+**Goal**: Support multiple users managing products
 
-**Create directory:** `lib/platforms/`
+1. **RBAC System** (10 days) - Roles and permissions
+2. **Audit Trail** (5 days) - Track who changed what
+3. **Comments/Collaboration** (5 days) - @mentions, discussions
+4. **CSV Import/Export** (5 days) - Team workflows
+5. **Webhooks** (7 days) - Integrate with other tools
 
-**Files to create:**
-- `lib/platforms/shopify/oauth.ts`
-- `lib/platforms/shopify/api.ts`
-- `lib/platforms/etsy/oauth.ts`
-- `lib/platforms/etsy/api.ts`
-- `lib/platforms/bigcommerce/connect.ts`
-- `lib/platforms/tiktok/oauth.ts`
-
-Each OAuth file implements:
-- `getAuthUrl(userId, state)` - Generate OAuth URL
-- `handleCallback(code, userId)` - Exchange code for tokens
-- `refreshToken(connectionId)` - Refresh expired tokens
-
-### 3.3 OAuth API Routes
-
-**Create routes:**
-```
-app/api/auth/connect/
-  ├── shopify/route.ts      # Initiates Shopify OAuth
-  ├── etsy/route.ts         # Initiates Etsy OAuth
-  ├── bigcommerce/route.ts  # Manual BigCommerce connection
-  └── tiktok/route.ts       # Initiates TikTok OAuth
-
-app/api/auth/callback/
-  ├── shopify/route.ts      # Handles Shopify callback
-  ├── etsy/route.ts         # Handles Etsy callback
-  └── tiktok/route.ts       # Handles TikTok callback
-```
-
-Each route:
-1. Verifies CSRF state
-2. Exchanges code for tokens
-3. Encrypts and stores tokens in StoreConnection
-4. Redirects to success page
+**Total**: 32 days (~6.5 weeks)
 
 ---
 
-## Phase 4: Store Connections API (Week 2-3)
+## 📊 Feature Breakdown by Category
 
-### 4.1 Store Connection CRUD
+### 1. Data Management (Import/Export)
 
-**File:** `app/api/stores/route.ts`
+#### CSV/XLSX Import with Validation ⭐⭐⭐⭐⭐
+**Why**: Bulk add 1000s of products at once  
+**Effort**: 5 days  
+**Database**: `BulkImport` model  
+**APIs**: `POST /api/products/import`
 
-```typescript
-GET    /api/stores          # List user's store connections
-POST   /api/stores          # Create new connection (OAuth or manual)
+**What You'll Get**:
+```
+1. Upload CSV/XLSX file
+2. Validate each row (show errors)
+3. Map columns to fields
+4. Preview before import
+5. Background processing
+6. Error report with line numbers
 ```
 
-**File:** `app/api/stores/[id]/route.ts`
-
-```typescript
-GET    /api/stores/[id]     # Get connection details
-PATCH  /api/stores/[id]     # Update connection (reauth, toggle active)
-DELETE /api/stores/[id]     # Disconnect store
-```
-
-**File:** `app/api/stores/[id]/sync/route.ts`
-
-```typescript
-POST   /api/stores/[id]/sync  # Trigger manual sync
-```
-
-### 4.2 Store Connection Operations
-
-**File:** `lib/stores/operations.ts`
-
-Functions:
-- `createStoreConnection(userId, platform, authData)` - Create new connection
-- `getStoreConnections(userId, platform?)` - Get user's connections
-- `disconnectStore(userId, connectionId)` - Remove connection
-- `syncStoreProducts(connectionId)` - Sync products from platform
-- `getConnectionHealth(connectionId)` - Check if tokens valid
+**Implementation Steps**:
+1. Add file upload component
+2. Parse CSV/XLSX (use `papaparse` or `xlsx` library)
+3. Validate rows against schema
+4. Show validation results in table
+5. Allow fixes and re-validation
+6. Process in background job queue
+7. Send email when complete
 
 ---
 
-## Phase 5: Store Connections UI (Week 3)
+### 2. Channel Management
 
-### 5.1 Store Connections Page
+#### Pre-flight Validation ⭐⭐⭐⭐⭐
+**Why**: Catch errors before pushing to platforms  
+**Effort**: 3 days  
+**APIs**: `POST /api/products/validate`
 
-**File:** `app/stores/page.tsx`
-
-Components needed:
-- List of connected stores (grouped by platform)
-- Connect button for each platform
-- Store cards showing: name, URL, status, product count, last synced
-- Disconnect button per store
-- Manual sync button per store
-
-### 5.2 Connect Store Modal
-
-**File:** `components/stores/connect-store-modal.tsx`
-
-Features:
-- Platform selection
-- OAuth flow initiation
-- Manual input for BigCommerce
-- Loading states during OAuth
-- Success/error feedback
-
-### 5.3 Store Connection Status
-
-**File:** `components/stores/connection-status.tsx`
-
-Shows:
-- ✅ Connected & Synced
-- 🔄 Syncing...
-- ⚠️ Needs Re-authentication
-- ❌ Connection Error
-
----
-
-## Phase 6: Product Management Updates (Week 3-4)
-
-### 6.1 Unified Product List
-
-**File:** `app/products/page.tsx`
-
-Features:
-- Show products from all sources (OAuth + legacy)
-- Filter by: Platform, Store, Import Method, Status
-- Columns: Image, Name, SKU, Price, Platform, Store, Status
-- Bulk actions: Sync, Delete, Export
-- Search integration (existing Meilisearch)
-
-### 6.2 Product Import from Stores
-
-**File:** `app/api/products/import/route.ts`
-
-```typescript
-POST /api/products/import
-{
-  storeConnectionId: string
-  productIds?: string[]  // Optional: specific products
-}
+**What You'll Get**:
+```
+Before pushing to BigCommerce:
+✓ Images are < 5MB
+✓ Title is < 250 characters
+✓ Required fields filled
+✗ Category not allowed
+✗ Restricted term found: "guaranteed"
 ```
 
-Fetches products from connected store and saves to database.
+#### Per-Channel Overrides ⭐⭐⭐⭐
+**Why**: Optimize listings per platform  
+**Effort**: 7 days  
+**Database**: `ChannelOverride` model
 
-### 6.3 Product Detail/Edit
+**Example Use Case**:
+```
+Master Product: "Running Shoes"
+├─ Shopify Override: "Premium Running Shoes - Free Shipping"
+├─ Etsy Override: "Handcrafted Artisan Running Shoes"
+└─ TikTok Override: "Viral TikTok Running Shoes 🔥"
+```
 
-**File:** `app/products/[id]/edit/page.tsx`
-
-Dynamic form based on:
-- Platform (Etsy, Shopify, BigCommerce, TikTok)
-- Import method (OAuth vs legacy)
-- Platform-specific validation rules
+#### Channel Mapping Rules ⭐⭐⭐
+**Why**: Map attributes correctly per platform  
+**Effort**: 5 days  
+**Database**: `ChannelMappingRule` model
 
 ---
 
-## Phase 7: Admin Features (Week 4)
+### 3. Inventory Management
 
-### 7.1 Admin User Permission Management
+#### Real-time Inventory Sync ⭐⭐⭐⭐⭐
+**Why**: Prevent overselling across platforms  
+**Effort**: 7 days  
+**Database**: `InventorySync` model
 
-**File:** `app/admin/users/[userId]/page.tsx`
+**How It Works**:
+```
+1. Shopify sale: quantity = 5
+2. Webhook received
+3. Update master inventory: quantity = 5
+4. Push to BigCommerce: quantity = 5
+5. Push to Etsy: quantity = 5
+6. All platforms show same stock level
+```
 
-Sections:
-- User basic info
-- Current subscription
-- **Legacy Feature Permissions** (toggles for Etsy/TikTok)
-- Store connection limit override
-- Grant/revoke permissions button
+#### Conflict Resolution ⭐⭐⭐⭐
+**Why**: Handle simultaneous sales  
+**Effort**: 3 days (included in sync)
 
-### 7.2 Admin Store Connections Overview
+**Example**:
+```
+Conflict detected:
+- Shopify says: 5 units
+- Etsy says: 3 units (2 sold)
+- BigCommerce says: 4 units (1 sold)
 
-**File:** `app/admin/stores/page.tsx`
+Resolution options:
+1. Use lowest (safest): 3 units
+2. Use master store: 5 units
+3. Calculate sum of sales: 5 - 3 = 2 units
+```
 
-Features:
-- View ALL users' store connections
-- Filter by platform, status, user
-- Force disconnect stores
-- View connection health
-- Platform API status monitoring
+#### Bundles/Kits ⭐⭐⭐
+**Why**: Sell product bundles  
+**Effort**: 5 days  
+**Database**: `ProductBundle` model
 
-### 7.3 Admin Permission API
+---
 
-**File:** `app/api/admin/users/[userId]/permissions/route.ts`
+### 4. Automation
 
-```typescript
-PUT /api/admin/users/[userId]/permissions
-{
-  allowLegacyEtsyImport: boolean
-  allowLegacyTikTokExport: boolean
-}
+#### Rules Builder (No-Code) ⭐⭐⭐⭐⭐
+**Why**: Automate repetitive tasks  
+**Effort**: 10 days  
+**Database**: `AutomationRule` model
+
+**Example Rules**:
+```
+WHEN inventory < 10 AND tag = "clearance"
+THEN decrease price by 15%
+
+WHEN platform = ETSY AND category = "vintage"
+THEN add tags ["retro", "antique", "collectible"]
+
+WHEN last_synced > 7 days ago
+THEN re-sync from platform
+```
+
+**UI**: Visual drag-and-drop rule builder
+
+#### Pricing Engine ⭐⭐⭐⭐⭐
+**Why**: Dynamic pricing strategies  
+**Effort**: 5 days  
+**Database**: `PricingRule` model
+
+**Formulas Supported**:
+```
+cost * 1.5                    (50% markup)
+cost * 1.5 + 5                (markup + fixed)
+compareAtPrice * 0.8          (20% off retail)
+MAX(cost * 1.3, minPrice)     (with minimum)
+IF(inventory < 10, price * 1.1, price)  (conditional)
+```
+
+#### Scheduled Operations ⭐⭐⭐⭐
+**Why**: Set it and forget it  
+**Effort**: 5 days  
+**Database**: `ScheduledOperation` model
+
+**Examples**:
+```
+- Sync all stores at midnight
+- Update prices every Monday at 6am
+- Export reports every Friday
+- Re-price clearance items daily
 ```
 
 ---
 
-## Phase 8: Dashboard Integration (Week 5)
+### 5. Intelligence (AI)
 
-### 8.1 Updated Dashboard Navigation
+#### AI Content Generation ⭐⭐⭐⭐
+**Why**: Save hours writing descriptions  
+**Effort**: 7 days  
+**APIs**: `POST /api/ai/generate`
 
-**File:** `app/dashboard/page.tsx`
-
-Navigation structure:
+**What It Can Do**:
 ```
-Main Features:
-- Products (all products)
-- Store Connections (OAuth stores)
-- Billing
-- Settings
-
-Legacy Features (conditional):
-- Etsy Import (if permission granted)
-- TikTok Export (if permission granted)
-```
-
-### 8.2 Dashboard Stats
-
-Update to show:
-- Total products (by import method)
-- Connected stores count
-- Products by platform
-- Recent syncs
-- Connection health warnings
-
----
-
-## Phase 9: Subscription Enforcement (Week 5)
-
-### 9.1 Store Connection Limits
-
-Implement checks in:
-- `app/api/auth/connect/*/route.ts` - Before OAuth
-- `app/api/stores/route.ts` - Before manual connection
-- UI - Disable connect button if at limit
-
-Limits by tier:
-- FREE: 1 store total
-- STARTER: 2 stores total
-- PROFESSIONAL: Unlimited, Etsy + TikTok access
-- ENTERPRISE: Unlimited, all features
-
-### 9.2 Platform Access by Tier
-
-Block Etsy and TikTok OAuth for non-Professional users:
-```typescript
-if ((platform === 'ETSY' || platform === 'TIKTOK') && 
-    tier !== 'PROFESSIONAL' && tier !== 'ENTERPRISE') {
-  return { allowed: false, reason: 'Upgrade to Professional' }
-}
+Input: Product data
+Output:
+- SEO-optimized title
+- Platform-specific descriptions
+- Bullet points
+- Hashtags
+- Alt text for images
+- Category suggestions
 ```
 
-### 9.3 Upgrade Prompts
+**Cost**: ~$0.01-0.05 per product (OpenAI API)
 
-**File:** `components/upgrade-prompt.tsx`
-
-Show when:
-- User hits store connection limit
-- User tries to connect Etsy/TikTok without Pro tier
-- User tries to use legacy feature without permission
+#### Category Auto-Classification ⭐⭐⭐
+**Why**: Correct categories = better visibility  
+**Effort**: 3 days  
+**Uses**: Machine learning model
 
 ---
 
-## Phase 10: Testing & Polish (Week 6)
+### 6. Analytics & Reporting
 
-### 10.1 OAuth Flow Testing
+#### Performance Analytics ⭐⭐⭐⭐
+**Why**: Know what's selling  
+**Effort**: 5 days  
+**Database**: `ProductPerformance` model
 
-Test each platform:
-- [ ] Shopify OAuth complete flow
-- [ ] Etsy OAuth complete flow
-- [ ] BigCommerce manual connection
-- [ ] TikTok OAuth complete flow
-- [ ] Token refresh logic
-- [ ] Error handling (denied, expired, invalid)
+**Metrics**:
+```
+- Views, clicks, conversions by product
+- Revenue trends (7d, 30d, 90d)
+- Best/worst performers
+- Platform comparison
+- Category analysis
+```
 
-### 10.2 Permission System Testing
+#### Inventory Velocity ⭐⭐⭐
+**Why**: Know when to reorder  
+**Effort**: 3 days
 
-- [ ] Legacy features blocked for regular users
-- [ ] Admin can always access legacy features
-- [ ] Admin can grant permissions to users
-- [ ] Permissions persist across sessions
-- [ ] Proper error messages when denied
-
-### 10.3 Product Sync Testing
-
-- [ ] Import products from Shopify
-- [ ] Import products from Etsy (OAuth)
-- [ ] Import products from BigCommerce
-- [ ] Sync updates to products
-- [ ] Handle deleted products on platform
-- [ ] Legacy import still works (with permission)
-
-### 10.4 Subscription Limits
-
-- [ ] FREE user limited to 1 store
-- [ ] STARTER user limited to 2 stores
-- [ ] PRO user unlimited stores
-- [ ] Etsy/TikTok blocked for non-Pro
-- [ ] Upgrade prompts shown correctly
+**Shows**:
+```
+Product: Running Shoes
+- Sold 15 units in last 7 days
+- Average: 2.1 units/day
+- Current stock: 42 units
+- Days until stockout: 20 days
+- Reorder point: 14 units (7 days stock)
+```
 
 ---
 
-## Phase 11: Documentation (Week 6)
+### 7. Team Collaboration
 
-### 11.1 User Documentation
+#### RBAC (Roles & Permissions) ⭐⭐⭐⭐
+**Why**: Control who can do what  
+**Effort**: 10 days  
+**Database**: `Role`, `UserRole` models
 
-**Create:**
-- `docs/USER_GUIDE.md` - How to connect stores
-- `docs/LEGACY_FEATURES.md` - When to use legacy vs OAuth
-- `docs/FAQ.md` - Common questions
+**Roles**:
+```
+Admin: Full access
+Manager: Edit + publish, no delete
+Editor: Edit only, cannot publish
+Viewer: Read-only access
 
-### 11.2 Admin Documentation
+Per-store permissions:
+- User can edit Store A but only view Store B
+```
 
-**Create:**
-- `docs/ADMIN_GUIDE.md` - Managing users & permissions
-- `docs/PLATFORM_SETUP.md` - OAuth app registration guide
+#### Audit Trail ⭐⭐⭐⭐⭐
+**Why**: Track all changes  
+**Effort**: 5 days  
+**Database**: `AuditLog` model
 
-### 11.3 Developer Documentation
+**What's Logged**:
+```
+2025-10-13 14:30:22
+User: john@example.com
+Action: product.update
+Product: "Running Shoes" (ID: abc123)
+Changes:
+  price: $89.99 → $79.99
+  tags: ["running"] → ["running", "sale"]
+IP: 192.168.1.100
+```
 
-**Create:**
-- `docs/OAUTH_FLOW.md` - How OAuth integration works
-- `docs/PLATFORM_ADAPTERS.md` - Adding new platforms
-- `docs/API_REFERENCE.md` - API endpoints
-
----
-
-## Deployment Checklist
-
-### Pre-Deployment
-
-- [ ] All OAuth apps registered in production (Etsy, Shopify, TikTok)
-- [ ] Production environment variables configured
-- [ ] Database migration tested on staging
-- [ ] All tests passing
-- [ ] Documentation complete
-
-### Deployment Steps
-
-1. **Backup database**
-   ```bash
-   pg_dump $DATABASE_URL > backup-$(date +%Y%m%d).sql
-   ```
-
-2. **Run migrations**
-   ```bash
-   npx prisma migrate deploy
-   ```
-
-3. **Seed legacy permissions**
-   ```bash
-   npm run seed:legacy-permissions
-   ```
-
-4. **Deploy application**
-   ```bash
-   git push production main
-   ```
-
-5. **Verify OAuth redirects**
-   - Test each platform's OAuth flow
-   - Verify redirect URIs match registered apps
-
-6. **Monitor errors**
-   - Check Sentry/logging for OAuth errors
-   - Monitor database connections
-   - Watch for token refresh failures
-
-### Post-Deployment
-
-- [ ] Test Google OAuth (existing)
-- [ ] Test Shopify OAuth (new)
-- [ ] Test Etsy OAuth (new)
-- [ ] Test BigCommerce connection (new)
-- [ ] Test legacy feature permissions
-- [ ] Test admin permission management
-- [ ] Update pricing page with new features
-- [ ] Send announcement email to users
+#### Comments & @Mentions ⭐⭐⭐
+**Why**: Discuss products with team  
+**Effort**: 5 days  
+**Database**: `ProductComment` model
 
 ---
 
-## Success Metrics
+### 8. Reliability
 
-Track these after deployment:
+#### Dead-Letter Queue ⭐⭐⭐⭐⭐
+**Why**: Handle failures gracefully  
+**Effort**: 3 days  
+**Database**: `FailedOperation` model
 
-**Technical:**
-- OAuth success rate per platform
-- Token refresh success rate
-- Store sync completion rate
-- Average sync time per platform
-- API error rates
+**How It Works**:
+```
+1. Push to BigCommerce fails (rate limit)
+2. Operation moved to dead-letter queue
+3. Show in "Failed Operations" dashboard
+4. Retry automatically after cooldown
+5. Or manual retry with button
+```
 
-**Business:**
-- Store connections created (per platform)
-- Legacy feature usage vs OAuth
-- Upgrade rate (Free → Pro for Etsy/TikTok)
-- Support tickets related to connections
-- User satisfaction with OAuth vs legacy
+#### Webhooks System ⭐⭐⭐⭐
+**Why**: Integrate with other tools  
+**Effort**: 7 days  
+**Database**: `Webhook` model
 
-**Adoption:**
-- % of users with ≥1 store connected
-- Average stores per user (by tier)
-- Most popular platform
-- Legacy feature usage decline over time
+**Events Available**:
+```
+- product.created
+- product.updated
+- product.deleted
+- inventory.low
+- sync.completed
+- bulk_operation.completed
+```
 
----
-
-## Risk Mitigation
-
-### OAuth Token Expiry
-- Implement auto-refresh before expiry
-- Alert users when manual re-auth needed
-- Queue failed syncs for retry after re-auth
-
-### Platform API Changes
-- Version API calls where possible
-- Monitor platform developer changelogs
-- Implement graceful degradation
-- Show clear error messages to users
-
-### Migration Issues
-- Keep legacy features working during rollout
-- Allow both systems to coexist
-- Gradual migration, not forced
-- Clear communication about changes
-
-### User Confusion
-- Clear UI distinction: OAuth vs Legacy
-- Tooltips explaining differences
-- Migration guide for existing users
-- Support documentation ready
+#### Row-Level Locking ⭐⭐⭐
+**Why**: Prevent concurrent edits  
+**Effort**: 2 days  
+**Database**: Add `version` field to `Product`
 
 ---
 
-## Future Enhancements (Post-MVP)
+## 📅 Phased Implementation Plan
 
-### Phase 12+: Advanced Features
+### Phase 1: Critical Foundation (4 weeks)
+**Goal**: Make system production-ready
 
-1. **Bi-directional Sync**
-   - Changes in TEKMS push to platforms
-   - Webhook listeners for platform changes
-   - Conflict resolution UI
+- [ ] CSV/XLSX Import with validation (5 days)
+- [ ] Pre-flight validation (3 days)
+- [ ] Dead-letter queue (3 days)
+- [ ] Audit trail (5 days)
+- [ ] Per-channel overrides (7 days)
 
-2. **Bulk Operations**
-   - Bulk import from multiple stores
-   - Bulk price updates across platforms
-   - Bulk category mapping
-
-3. **Advanced Product Editor**
-   - Side-by-side platform comparison
-   - Template system for common products
-   - AI-powered description optimization
-
-4. **Analytics Dashboard**
-   - Products per platform over time
-   - Sync health metrics
-   - Platform performance comparison
-   - Revenue tracking per platform
-
-5. **Scheduled Syncs**
-   - Cron jobs for automatic syncs
-   - Custom sync schedules per store
-   - Smart sync (only changed products)
-
-6. **Multi-user Workspaces**
-   - Team access to stores
-   - Role-based permissions within workspace
-   - Activity logs
+**Value**: Can import thousands of products, catch errors, track changes
 
 ---
 
-## Implementation Order (Recommended)
+### Phase 2: Automation (4 weeks)
+**Goal**: Reduce manual work
 
-### Week 1: Foundation
-- Day 1-2: Update Prisma schema, migrations
-- Day 3-4: Permission system (helpers, route guards)
-- Day 5: Update legacy pages with permission checks
+- [ ] Pricing engine (5 days)
+- [ ] Rules builder (10 days)
+- [ ] Scheduled operations (5 days)
+- [ ] Basic AI generation (7 days)
 
-### Week 2: OAuth Infrastructure
-- Day 1-2: Shopify OAuth (easiest to implement)
-- Day 3-4: Store Connections API
-- Day 5: Testing & debugging Shopify flow
-
-### Week 3: UI Development
-- Day 1-3: Store Connections page UI
-- Day 4-5: Connect Store modal & OAuth flows
-
-### Week 4: Additional Platforms
-- Day 1-2: Etsy OAuth
-- Day 3-4: BigCommerce connection
-- Day 5: Testing all platforms
-
-### Week 5: Product Management
-- Day 1-2: Unified product list updates
-- Day 3-4: Product import from stores
-- Day 5: Platform-specific editors
-
-### Week 6: Admin & Polish
-- Day 1-2: Admin permission management
-- Day 3-4: Subscription enforcement
-- Day 5: Testing, bug fixes, documentation
+**Value**: Set up rules once, system runs itself
 
 ---
 
-## Current Status
+### Phase 3: Intelligence (3 weeks)
+**Goal**: Data-driven decisions
 
-✅ **Completed:**
-- Architecture planning
-- Hybrid approach approved
-- Documentation created
+- [ ] Performance analytics (5 days)
+- [ ] Inventory sync (7 days)
+- [ ] Velocity tracking (3 days)
+- [ ] Advanced AI (5 days)
 
-🔄 **In Progress:**
-- Implementation roadmap
+**Value**: Know what's working, prevent stockouts
 
-⏳ **Next Steps:**
-1. Switch to Code mode
-2. Update Prisma schema
-3. Implement permission system
-4. Start Shopify OAuth integration
+---
 
-**Ready to begin implementation!** 🚀
+### Phase 4: Scale & Collaborate (3 weeks)
+**Goal**: Support teams
+
+- [ ] RBAC system (10 days)
+- [ ] Webhooks (7 days)
+- [ ] Comments system (5 days)
+
+**Value**: Multi-user support, integrations
+
+---
+
+## 💰 Cost-Benefit Analysis
+
+### High ROI Features (Do First)
+1. **CSV Import** - Save 40 hours/month (vs manual entry)
+2. **Pricing Engine** - Increase margins by 5-15%
+3. **Rules Builder** - Save 20 hours/month (automation)
+4. **Inventory Sync** - Prevent $10k+ in overselling losses
+5. **Dead-Letter Queue** - Reduce support tickets by 30%
+
+### Medium ROI Features
+6. **AI Generation** - Save 10 hours/month (content writing)
+7. **Analytics** - Better product decisions
+8. **Per-Channel Overrides** - 10-20% better conversion
+9. **Audit Trail** - Compliance & debugging
+10. **Pre-flight Validation** - Reduce errors by 50%
+
+### Lower ROI (Nice to Have)
+11. **RBAC** - Only if you have a team
+12. **Webhooks** - Only if you need integrations
+13. **Comments** - Only for collaboration
+14. **Bundles** - Only if you sell kits
+
+---
+
+## 🚀 Quick Start Recommendations
+
+### For Solo Entrepreneurs
+**Focus**: Import, pricing, automation
+```
+Week 1-2: CSV Import
+Week 3: Pricing Engine
+Week 4-5: Rules Builder
+Week 6: Dead-Letter Queue
+```
+
+### For Small Teams (2-5 people)
+**Focus**: Import, collaboration, automation
+```
+Week 1-2: CSV Import
+Week 3-4: RBAC System
+Week 5: Audit Trail
+Week 6-7: Rules Builder
+Week 8: Pricing Engine
+```
+
+### For Agencies/Power Users
+**Focus**: Scale, intelligence, integration
+```
+Week 1-2: CSV Import
+Week 3-4: RBAC + Audit Trail
+Week 5-6: Rules Builder
+Week 7-8: Analytics Dashboard
+Week 9-10: Webhooks
+Week 11-12: AI Generation
+```
+
+---
+
+## ❓ Decision Framework
+
+### Ask Yourself:
+
+**1. What's your biggest pain point right now?**
+- Manual data entry → CSV Import
+- Wrong prices → Pricing Engine
+- Overselling → Inventory Sync
+- Too much manual work → Rules Builder
+- Don't know what's selling → Analytics
+
+**2. How many products do you manage?**
+- < 100 products: Focus on optimization (pricing, AI)
+- 100-1000 products: Focus on bulk tools (import, rules)
+- > 1000 products: Focus on automation + analytics
+
+**3. Do you have a team?**
+- Solo: Skip RBAC, comments
+- 2-5 people: Add RBAC, audit trail
+- 5+ people: Add full collaboration suite
+
+**4. What's your budget?**
+- Tight: Focus on high-ROI features only
+- Moderate: Add automation and intelligence
+- Flexible: Build complete system
+
+---
+
+## 📋 Next Steps
+
+1. **Review this roadmap**
+2. **Choose your priority** (Option A, B, or C)
+3. **I'll create detailed specs** for your top 3 features
+4. **Start implementation** in code mode
+5. **Test and iterate**
+
+Would you like me to:
+- Start with a specific feature?
+- Create detailed technical specs?
+- Build a custom roadmap for your needs?
+- Switch to code mode and begin implementing?
+
+---
+
+**Remember**: Your current system is already functional. These are enhancements to take it from "good" to "great". Prioritize based on your business needs, not feature count.

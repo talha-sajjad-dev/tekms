@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { rateLimitedFetch, logRateLimitStatus } from '@/lib/bigcommerce/rate-limiter'
 import { canPerformAction, checkFeatureAccess } from '@/lib/subscription/enforcement'
+import { classifyError, getUserMessage, formatErrorForLog } from '@/lib/sync-errors'
 
 /**
  * Sync products from store
@@ -177,21 +178,32 @@ async function performSync(store: any, jobId: string): Promise<number> {
   } catch (error) {
     console.error('Sync error:', error)
     
-    // Update store with error
+    // Classify the error for better user messaging
+    const errorInfo = classifyError(error)
+    const userMessage = getUserMessage(error)
+    const errorLog = formatErrorForLog(error, {
+      storeId: store.id,
+      storeName: store.storeName,
+      platform: store.platform
+    })
+    
+    console.error('Classified error:', errorLog)
+    
+    // Update store with detailed error
     await db.storeConnection.update({
       where: { id: store.id },
       data: {
         syncStatus: 'error',
-        syncError: error instanceof Error ? error.message : 'Unknown error'
+        syncError: userMessage
       }
     }).catch(console.error)
     
-    // Update sync job as failed
+    // Update sync job as failed with detailed error info
     await db.syncJob.update({
       where: { id: jobId },
       data: {
         status: 'failed',
-        errorLog: error instanceof Error ? error.message : 'Unknown error',
+        errorLog: errorLog,
         completedAt: new Date()
       }
     }).catch(console.error)
@@ -211,11 +223,11 @@ async function syncShopifyProducts(store: any, accessToken: string): Promise<num
     console.log(`🔄 Starting Shopify product sync for store: ${store.storeName}`)
     
     while (hasNextPage) {
-      const url = nextPageInfo
+      const url: string = nextPageInfo
         ? `https://${shopDomain}/admin/api/2024-01/products.json?limit=250&page_info=${nextPageInfo}`
         : `https://${shopDomain}/admin/api/2024-01/products.json?limit=250`
       
-      const response = await fetch(url, {
+      const response: Response = await fetch(url, {
         headers: {
           'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json'
@@ -230,7 +242,7 @@ async function syncShopifyProducts(store: any, accessToken: string): Promise<num
       allProducts = [...allProducts, ...(data.products || [])]
       
       // Shopify uses Link header for pagination
-      const linkHeader = response.headers.get('Link')
+      const linkHeader: string | null = response.headers.get('Link')
       nextPageInfo = linkHeader?.match(/<[^>]*page_info=([^&>]+)/)?.[1] || null
       hasNextPage = !!nextPageInfo
       
@@ -527,11 +539,11 @@ async function syncTikTokProducts(store: any, accessToken: string): Promise<numb
     console.log(`🔄 Starting TikTok product sync for store: ${store.storeName}`)
     
     while (true) {
-      const url = pageToken
+      const url: string = pageToken
         ? `https://open-api.tiktokglobalshop.com/product/202309/products/search?page_size=100&page_token=${pageToken}`
         : `https://open-api.tiktokglobalshop.com/product/202309/products/search?page_size=100`
       
-      const response = await fetch(url, {
+      const response: Response = await fetch(url, {
         headers: {
           'x-tts-access-token': accessToken,
           'Content-Type': 'application/json'
@@ -542,8 +554,8 @@ async function syncTikTokProducts(store: any, accessToken: string): Promise<numb
         throw new Error(`Failed to fetch TikTok products: ${response.statusText}`)
       }
       
-      const data = await response.json()
-      const products = data.data?.products || []
+      const data: any = await response.json()
+      const products: any[] = data.data?.products || []
       
       if (products.length === 0) break
       
