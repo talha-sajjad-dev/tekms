@@ -913,8 +913,18 @@ export default function ProductsPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   Full Edit
                 </Button>
-                <Button variant="outline" className="w-full justify-start" disabled>
-                  View Analytics
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon! 📊",
+                      description: "Product analytics feature is under development. Track views, clicks, and conversions per product.",
+                      duration: 5000
+                    })
+                  }}
+                >
+                  📊 View Analytics (Coming Soon)
                 </Button>
               </div>
             </div>
