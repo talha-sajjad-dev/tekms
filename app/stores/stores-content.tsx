@@ -503,10 +503,18 @@ export default function StoresPageContent() {
       <AlertDialog open={!!disconnectId} onOpenChange={() => setDisconnectId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect Store</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to disconnect this store? Your products will be preserved
-              but won't sync anymore. You can reconnect the store anytime.
+            <AlertDialogTitle>⚠️ Disconnect Store & Delete All Products</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p className="font-semibold text-destructive">
+                This action will permanently delete all products from this store!
+              </p>
+              <p>
+                All {stores.find(s => s.id === disconnectId)?.productCount || 0} products will be removed from your database.
+                You'll need to re-sync when you reconnect.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This action cannot be undone. Make sure you have backups if needed.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

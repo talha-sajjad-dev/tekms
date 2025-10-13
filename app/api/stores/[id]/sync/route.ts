@@ -451,7 +451,9 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
     
     // Process and save products to database in batches
     let syncedCount = 0
+    let failedCount = 0
     const batchSize = 50 // Process 50 products at a time
+    const errors: string[] = []
     
     console.log(`💾 Saving products to database in batches of ${batchSize}...`)
     
@@ -475,7 +477,7 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
             platform: 'BIGCOMMERCE' as const,
             externalId: bcProduct.id.toString(),
             storeConnectionId: store.id,
-            importMethod: 'oauth',
+            importMethod: 'oauth' as const,
             name: bcProduct.name,
             description: bcProduct.description || null,
             sku: bcProduct.sku || null,
@@ -497,21 +499,49 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
               where: { id: existing.id },
               data: productData
             })
+            console.log(`✓ Updated product ${bcProduct.id}: ${bcProduct.name}`)
           } else {
             // Create new product
             await db.product.create({
               data: productData
             })
+            console.log(`✓ Created product ${bcProduct.id}: ${bcProduct.name}`)
           }
           
           syncedCount++
         } catch (productError) {
-          console.error(`❌ Failed to sync product ${bcProduct.id}:`, productError)
-          // Continue with next product
+          failedCount++
+          const errorMsg = productError instanceof Error ? productError.message : String(productError)
+          console.error(`❌ Failed to sync product ${bcProduct.id} (${bcProduct.name}):`, productError)
+          errors.push(`Product ${bcProduct.id}: ${errorMsg}`)
+          
+          // If we're getting too many errors, abort the sync
+          if (failedCount > 10 && failedCount > syncedCount) {
+            throw new Error(`Sync aborted: Too many failures (${failedCount} failed, ${syncedCount} succeeded). Last error: ${errorMsg}`)
+          }
         }
       }
       
-      console.log(`✓ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allProducts.length / batchSize)} (${syncedCount} products synced)`)
+      console.log(`✓ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allProducts.length / batchSize)} (${syncedCount} synced, ${failedCount} failed)`)
+    }
+    
+    // Log final results
+    console.log(`\n📊 Sync Summary:`)
+    console.log(`   Total products fetched: ${allProducts.length}`)
+    console.log(`   Successfully synced: ${syncedCount}`)
+    console.log(`   Failed: ${failedCount}`)
+    
+    if (errors.length > 0) {
+      console.error(`\n⚠️ Errors encountered:`)
+      errors.slice(0, 10).forEach(err => console.error(`   - ${err}`))
+      if (errors.length > 10) {
+        console.error(`   ... and ${errors.length - 10} more errors`)
+      }
+    }
+    
+    // If nothing was synced, throw an error
+    if (syncedCount === 0 && allProducts.length > 0) {
+      throw new Error(`Failed to sync any products. ${errors.length > 0 ? 'First error: ' + errors[0] : 'Unknown error'}`)
     }
     
     // Update store's product count
