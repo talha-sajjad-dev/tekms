@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { 
   ArrowLeft, 
@@ -19,13 +21,30 @@ import {
   FileText,
   Link as LinkIcon,
   Search,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Plus,
+  Edit,
+  Trash2,
+  Eye
 } from "lucide-react"
 
 interface Setting {
   key: string
   value: string
   category: string
+}
+
+interface Page {
+  id: string
+  slug: string
+  title: string
+  content: string
+  metaTitle: string | null
+  metaDescription: string | null
+  isPublished: boolean
+  isFooterLink: boolean
+  displayOrder: number
+  updatedAt: string
 }
 
 export default function WebsiteSettingsPage() {
@@ -36,12 +55,27 @@ export default function WebsiteSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<Record<string, string>>({})
+  
+  // Page Management State
+  const [pages, setPages] = useState<Page[]>([])
+  const [editingPage, setEditingPage] = useState<Page | null>(null)
+  const [showPageForm, setShowPageForm] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
+  const [pageFormData, setPageFormData] = useState({
+    slug: '',
+    title: '',
+    content: '',
+    metaTitle: '',
+    metaDescription: '',
+    isPublished: true,
+    isFooterLink: false,
+    displayOrder: 0
+  })
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/")
     } else if (status === "authenticated") {
-      // Check if user is admin
       if (session?.user?.role !== "ADMIN") {
         toast({
           title: "Access Denied",
@@ -52,6 +86,7 @@ export default function WebsiteSettingsPage() {
         return
       }
       fetchSettings()
+      fetchPages()
     }
   }, [status])
 
@@ -80,11 +115,23 @@ export default function WebsiteSettingsPage() {
     }
   }
 
+  const fetchPages = async () => {
+    try {
+      const res = await fetch('/api/admin/pages')
+      const data = await res.json()
+      if (res.ok) {
+        setPages(data.pages || [])
+      }
+    } catch (error) {
+      console.error('Error fetching pages:', error)
+    }
+  }
+
   const updateSetting = (key: string, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleSave = async () => {
+  const handleSaveSettings = async () => {
     setSaving(true)
     try {
       const settingsArray = Object.entries(settings).map(([key, value]) => ({
@@ -102,7 +149,7 @@ export default function WebsiteSettingsPage() {
 
       if (res.ok) {
         toast({
-          title: "Success!",
+          title: "Settings Saved!",
           description: `Updated ${data.successCount} settings successfully`
         })
       } else {
@@ -121,6 +168,101 @@ export default function WebsiteSettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Page Management Functions
+  const handleSavePage = async () => {
+    setSaving(true)
+    try {
+      const url = editingPage 
+        ? `/api/admin/pages/${editingPage.id}`
+        : '/api/admin/pages'
+      
+      const res = await fetch(url, {
+        method: editingPage ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pageFormData)
+      })
+
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: `Page ${editingPage ? 'updated' : 'created'} successfully`
+        })
+        setShowPageForm(false)
+        setEditingPage(null)
+        fetchPages()
+        resetPageForm()
+      } else {
+        const data = await res.json()
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to save page',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save page',
+        variant: 'destructive'
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleEditPage = (page: Page) => {
+    setEditingPage(page)
+    setPageFormData({
+      slug: page.slug,
+      title: page.title,
+      content: page.content,
+      metaTitle: page.metaTitle || '',
+      metaDescription: page.metaDescription || '',
+      isPublished: page.isPublished,
+      isFooterLink: page.isFooterLink,
+      displayOrder: page.displayOrder
+    })
+    setShowPageForm(true)
+    setPreviewMode(false)
+  }
+
+  const handleDeletePage = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this page?')) return
+    
+    try {
+      const res = await fetch(`/api/admin/pages/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        toast({
+          title: 'Success',
+          description: 'Page deleted successfully'
+        })
+        fetchPages()
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete page',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const resetPageForm = () => {
+    setPageFormData({
+      slug: '',
+      title: '',
+      content: '',
+      metaTitle: '',
+      metaDescription: '',
+      isPublished: true,
+      isFooterLink: false,
+      displayOrder: 0
+    })
   }
 
   if (loading) {
@@ -147,11 +289,11 @@ export default function WebsiteSettingsPage() {
                   Website Settings
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Manage your website branding, content, and configuration
+                  Manage branding, pages, footer, icons, and SEO
                 </p>
               </div>
             </div>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSaveSettings} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Saving..." : "Save All Changes"}
             </Button>
@@ -265,7 +407,7 @@ export default function WebsiteSettingsPage() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Upload feature coming soon. For now, enter URL of logo file in /public folder
+                    Upload feature coming soon. For now, place logo in /public folder and enter the path
                   </p>
                 </div>
 
@@ -281,6 +423,15 @@ export default function WebsiteSettingsPage() {
                     Browser tab icon (16x16 or 32x32 pixels)
                   </p>
                 </div>
+
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save Branding Settings"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -291,7 +442,7 @@ export default function WebsiteSettingsPage() {
               <CardHeader>
                 <CardTitle>Platform Icons</CardTitle>
                 <CardDescription>
-                  Customize the icons shown in store connector
+                  Customize the icons shown in store connector. Leave empty to use defaults.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -361,75 +512,213 @@ export default function WebsiteSettingsPage() {
                     <a href="https://lucide.dev" target="_blank" className="underline">Lucide</a>
                   </p>
                 </div>
+
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save Platform Icons"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Pages Tab */}
+          {/* Pages Tab - Complete Page Management */}
           <TabsContent value="pages">
-            <div className="space-y-6">
+            {!showPageForm ? (
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Page Management</CardTitle>
+                        <CardDescription>
+                          Manage footer pages, legal docs, and website content
+                        </CardDescription>
+                      </div>
+                      <Button onClick={() => { setShowPageForm(true); setEditingPage(null); resetPageForm() }}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Page
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {pages.length === 0 ? (
+                      <div className="text-center py-12">
+                        <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">No pages yet</h3>
+                        <p className="text-muted-foreground mb-4">Create your first page to get started</p>
+                        <Button onClick={() => { setShowPageForm(true); resetPageForm() }}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Page
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {pages.map((page) => (
+                          <div key={page.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/30">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold">{page.title}</h3>
+                                {page.isPublished ? (
+                                  <Badge variant="default">Published</Badge>
+                                ) : (
+                                  <Badge variant="secondary">Draft</Badge>
+                                )}
+                                {page.isFooterLink && (
+                                  <Badge variant="outline">Footer Link</Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">/{page.slug}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Updated: {new Date(page.updatedAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditPage(page)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => window.open(`/${page.slug}`, '_blank')}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleDeletePage(page.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>Homepage</CardTitle>
-                  <CardDescription>Configure homepage content</CardDescription>
+                  <CardTitle>{editingPage ? 'Edit Page' : 'Create New Page'}</CardTitle>
+                  <CardDescription>
+                    {previewMode ? 'Preview mode' : 'Edit mode'}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="homepage-hero">Hero Title</Label>
-                    <Input
-                      id="homepage-hero"
-                      value={settings['page.homepage_hero'] || ''}
-                      onChange={(e) => updateSetting('page.homepage_hero', e.target.value)}
-                      placeholder="Welcome to TEKMS"
-                    />
-                  </div>
+                <CardContent className="space-y-6">
+                  {!previewMode ? (
+                    <>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="page-title">Page Title</Label>
+                          <Input
+                            id="page-title"
+                            value={pageFormData.title}
+                            onChange={(e) => setPageFormData({ ...pageFormData, title: e.target.value })}
+                            placeholder="About Us"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="page-slug">URL Slug</Label>
+                          <Input
+                            id="page-slug"
+                            value={pageFormData.slug}
+                            onChange={(e) => setPageFormData({ ...pageFormData, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                            placeholder="about-us"
+                          />
+                          <p className="text-xs text-muted-foreground">URL: /{pageFormData.slug}</p>
+                        </div>
+                      </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="homepage-desc">Hero Description</Label>
-                    <Textarea
-                      id="homepage-desc"
-                      value={settings['page.homepage_description'] || ''}
-                      onChange={(e) => updateSetting('page.homepage_description', e.target.value)}
-                      placeholder="Manage your products across multiple platforms"
-                      rows={3}
-                    />
+                      <div className="space-y-2">
+                        <Label htmlFor="page-content">Page Content (HTML)</Label>
+                        <Textarea
+                          id="page-content"
+                          value={pageFormData.content}
+                          onChange={(e) => setPageFormData({ ...pageFormData, content: e.target.value })}
+                          placeholder="<h1>Welcome</h1><p>Your content here...</p>"
+                          rows={15}
+                          className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">Supports HTML formatting</p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="meta-title">Meta Title (SEO)</Label>
+                          <Input
+                            id="meta-title"
+                            value={pageFormData.metaTitle}
+                            onChange={(e) => setPageFormData({ ...pageFormData, metaTitle: e.target.value })}
+                            placeholder="About Us - TEKMS"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="meta-desc">Meta Description (SEO)</Label>
+                          <Input
+                            id="meta-desc"
+                            value={pageFormData.metaDescription}
+                            onChange={(e) => setPageFormData({ ...pageFormData, metaDescription: e.target.value })}
+                            placeholder="Learn more about TEKMS..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={pageFormData.isPublished}
+                            onCheckedChange={(checked) => setPageFormData({ ...pageFormData, isPublished: checked })}
+                          />
+                          <Label>Published</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={pageFormData.isFooterLink}
+                            onCheckedChange={(checked) => setPageFormData({ ...pageFormData, isFooterLink: checked })}
+                          />
+                          <Label>Show in Footer</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="display-order">Display Order</Label>
+                          <Input
+                            id="display-order"
+                            type="number"
+                            value={pageFormData.displayOrder}
+                            onChange={(e) => setPageFormData({ ...pageFormData, displayOrder: parseInt(e.target.value) || 0 })}
+                            className="w-24"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="prose prose-slate max-w-none p-6 border rounded-lg bg-white">
+                      <h1>{pageFormData.title}</h1>
+                      <div dangerouslySetInnerHTML={{ __html: pageFormData.content }} />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-4 border-t">
+                    <Button onClick={handleSavePage} disabled={saving}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Page'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setPreviewMode(!previewMode)}
+                    >
+                      {previewMode ? <Edit className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                      {previewMode ? 'Edit' : 'Preview'}
+                    </Button>
+                    <Button variant="ghost" onClick={() => { setShowPageForm(false); setEditingPage(null); resetPageForm() }}>
+                      Cancel
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Content Pages</CardTitle>
-                  <CardDescription>Manage about, contact, and legal pages</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="about-content">About Page Content</Label>
-                    <Textarea
-                      id="about-content"
-                      value={settings['page.about_content'] || ''}
-                      onChange={(e) => updateSetting('page.about_content', e.target.value)}
-                      placeholder="Tell your story..."
-                      rows={6}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Basic HTML supported. Rich text editor coming soon.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-info">Contact Information</Label>
-                    <Textarea
-                      id="contact-info"
-                      value={settings['page.contact_info'] || ''}
-                      onChange={(e) => updateSetting('page.contact_info', e.target.value)}
-                      placeholder="Email: support@example.com&#10;Phone: (555) 123-4567"
-                      rows={4}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            )}
           </TabsContent>
 
           {/* Footer Tab */}
@@ -494,6 +783,15 @@ export default function WebsiteSettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save Footer Settings"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -547,6 +845,15 @@ export default function WebsiteSettingsPage() {
                     Image shown when shared on social media (1200x630px recommended)
                   </p>
                 </div>
+
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save SEO Settings"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -594,23 +901,19 @@ export default function WebsiteSettingsPage() {
                     <strong>⚠️ Advanced:</strong> Custom CSS can affect site styling. Test changes carefully.
                   </p>
                 </div>
+
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={saving}
+                  className="w-full"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save General Settings"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Sticky Save Button */}
-        <div className="fixed bottom-6 right-6">
-          <Button 
-            size="lg" 
-            onClick={handleSave} 
-            disabled={saving}
-            className="shadow-lg bg-gradient-to-r from-blue-600 to-cyan-600"
-          >
-            <Save className="h-5 w-5 mr-2" />
-            {saving ? "Saving..." : "Save All Changes"}
-          </Button>
-        </div>
       </div>
     </div>
   )

@@ -72,10 +72,10 @@ export default function AdminDashboardPage() {
       badge: 'Essential'
     },
     {
-      title: 'Page Management',
-      description: 'Edit footer pages, legal docs, and website content',
+      title: 'Website Settings',
+      description: 'Manage branding, pages, footer, platform icons, and SEO',
       icon: FileText,
-      href: '/admin/pages',
+      href: '/admin/settings/website',
       color: 'from-cyan-600 to-blue-600',
       badge: null
     },
