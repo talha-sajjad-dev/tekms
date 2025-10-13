@@ -89,8 +89,14 @@ export default function StoreDetailPage() {
     
     if (useBackground) {
       toast({
-        title: "Large Store Detected",
-        description: `This store has ${store.productCount} products. Sync will run in the background to prevent timeouts.`,
+        title: "🔄 Large Store Detected",
+        description: `This store has ${store.productCount.toLocaleString()} products. Sync will run in the background to prevent timeouts. You can continue working while products are being synced.`,
+        duration: 5000,
+      })
+    } else {
+      toast({
+        title: "🔄 Sync Started",
+        description: `Syncing products from ${store?.storeName}...`,
       })
     }
     
@@ -108,27 +114,46 @@ export default function StoreDetailPage() {
       if (res.ok) {
         if (data.background) {
           toast({
-            title: "Sync Started",
-            description: `Background sync job started. This may take several minutes for large catalogs. Job ID: ${data.jobId}`,
+            title: "✅ Background Sync Started",
+            description: `Sync job ${data.jobId.slice(0, 8)}... is now running. This may take several minutes. The page will refresh automatically when complete.`,
+            duration: 7000,
           })
+          
+          // Poll for completion every 10 seconds
+          const pollInterval = setInterval(async () => {
+            const storeRes = await fetch(`/api/stores/${storeId}`)
+            const storeData = await storeRes.json()
+            if (storeData.store.syncStatus !== 'processing') {
+              clearInterval(pollInterval)
+              fetchStore()
+              toast({
+                title: "✅ Sync Complete",
+                description: `${storeData.store.productCount} products synced successfully!`,
+              })
+            }
+          }, 10000)
+          
+          // Stop polling after 5 minutes
+          setTimeout(() => clearInterval(pollInterval), 300000)
         } else {
           toast({
-            title: "Sync Complete",
-            description: `Successfully synced ${data.productCount} products`,
+            title: "✅ Sync Complete!",
+            description: `Successfully synced ${data.productCount} products from ${store?.storeName}`,
+            duration: 5000,
           })
         }
         fetchStore()
       } else {
         toast({
-          title: "Sync Failed",
+          title: "❌ Sync Failed",
           description: data.error || "Failed to sync store",
           variant: "destructive",
         })
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to sync store",
+        title: "❌ Error",
+        description: "Failed to sync store. Please try again.",
         variant: "destructive",
       })
     } finally {

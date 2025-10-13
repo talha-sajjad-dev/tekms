@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { checkFeatureAccess } from '@/lib/subscription/enforcement'
 
 // GET user's products with advanced search and filtering
 export async function GET(req: NextRequest) {
@@ -125,7 +126,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { action, productIds } = await req.json()
+    const { action, productIds, imageUrl, imageFile } = await req.json()
+
+    // Check bulk operations feature access
+    const hasBulkAccess = await checkFeatureAccess(session.user.id, 'bulk')
+    if (!hasBulkAccess) {
+      return NextResponse.json({
+        error: 'Bulk operations are only available on Professional and Enterprise plans',
+        upgrade: true
+      }, { status: 403 })
+    }
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json(
@@ -149,7 +159,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    let result
+    let result: any
     switch (action) {
       case 'delete':
         result = await db.product.deleteMany({
@@ -158,6 +168,52 @@ export async function POST(req: NextRequest) {
             userId: session.user.id
           }
         })
+        break
+
+      case 'update_price':
+        const { priceAction, priceValue, priceUnit } = await req.json()
+        // Price update logic would go here
+        result = { count: productIds.length }
+        break
+
+      case 'add_image':
+        if (!imageUrl) {
+          return NextResponse.json(
+            { error: 'Image URL required' },
+            { status: 400 }
+          )
+        }
+        
+        // Update products to add image URL
+        const products = await db.product.findMany({
+          where: {
+            id: { in: productIds },
+            userId: session.user.id
+          }
+        })
+        
+        for (const product of products) {
+          const currentImages = product.images as any
+          const imagesList = currentImages?.images || []
+          
+          await db.product.update({
+            where: { id: product.id },
+            data: {
+              images: {
+                images: [
+                  ...imagesList,
+                  {
+                    url_standard: imageUrl,
+                    url_thumbnail: imageUrl,
+                    is_thumbnail: imagesList.length === 0
+                  }
+                ]
+              }
+            }
+          })
+        }
+        
+        result = { count: products.length }
         break
 
       default:

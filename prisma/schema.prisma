@@ -36,6 +36,9 @@ model User {
   usageRecords     UsageRecord[]
   products         Product[]
   syncJobs         SyncJob[]
+  bulkOperations   BulkOperation[]
+  savedFilters     SavedFilter[]
+  aiOperations     AIOperation[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,6 +108,14 @@ model Subscription {
   status                 SubscriptionStatus @default(ACTIVE)
   cancelAtPeriodEnd      Boolean            @default(false)
   
+  // Admin gifted subscription tracking
+  isGifted               Boolean  @default(false)
+  giftedBy               String?  // Admin user ID who gifted
+  giftDuration           Int?     // Duration in months (1, 3, 12)
+  giftStartedAt          DateTime?
+  giftExpiresAt          DateTime?
+  giftNote               String?  // Optional note from admin
+  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   createdAt DateTime @default(now())
@@ -113,6 +124,7 @@ model Subscription {
   @@index([userId])
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([isGifted, giftExpiresAt])
 }
 
 enum SubscriptionTier {
@@ -476,4 +488,136 @@ model Page {
   
   @@index([slug])
   @@index([isPublished, isFooterLink])
+}
+
+// ============================================
+// BULK OPERATIONS & BACKGROUND JOBS
+// ============================================
+
+model BulkOperation {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "price_update", "publish", "sync", "delete", "add_image", etc.
+  status      String   // "queued", "processing", "completed", "failed", "cancelled"
+  
+  // Operation details
+  totalItems     Int
+  processedItems Int @default(0)
+  successItems   Int @default(0)
+  failedItems    Int @default(0)
+  
+  // What products were selected
+  filters     Json?    // Filter criteria used to select products
+  productIds  String[] // Explicit product IDs (if not using filters)
+  
+  // What changes to apply
+  changes     Json?    // The changes to be applied
+  
+  // Results and errors
+  results     Json?    // Detailed results per product
+  errorLog    String?  @db.Text
+  
+  // Progress tracking
+  progress    Int @default(0) // 0-100 percentage
+  currentItem String?  // Current product being processed
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId, status])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
+// SAVED FILTERS
+// ============================================
+
+model SavedFilter {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  
+  // Filter configuration
+  filters     Json     // Column filters, platform, status, price range, etc.
+  sortBy      String?  // Field to sort by
+  sortOrder   String?  // "asc" or "desc"
+  groupBy     String?  // Field to group by
+  
+  // Display
+  isDefault   Boolean @default(false)  // Use this filter by default
+  isPinned    Boolean @default(false)  // Show in quick access
+  icon        String?  // Optional icon name
+  color       String?  // Optional color for UI
+  
+  // Usage tracking
+  useCount    Int @default(0)
+  lastUsedAt  DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@index([userId, isPinned])
+}
+
+// ============================================
+// AI OPERATIONS
+// ============================================
+
+model AIOperation {
+  id            String   @id @default(cuid())
+  userId        String
+  productId     String?  // Nullable for bulk operations
+  operationType String   // "description", "title", "tags", "category", "image_enhance"
+  
+  // Input/Output
+  input         Json     // Original data + parameters
+  output        Json?    // Generated result
+  prompt        String?  @db.Text // AI prompt used
+  
+  // Status
+  status        String   // "queued", "processing", "completed", "failed"
+  error         String?  @db.Text
+  
+  // Cost tracking
+  model         String?  // AI model used (e.g., "gpt-4", "claude-3")
+  tokensUsed    Int?     // Tokens consumed
+  cost          Decimal? @db.Decimal(10, 4) // Cost in USD
+  
+  // Quality metrics
+  confidence    Decimal? @db.Decimal(5, 2) // 0-100 confidence score
+  userFeedback  String?  // "accepted", "rejected", "modified"
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  
+  @@index([userId, operationType])
+  @@index([userId, status])
+  @@index([createdAt])
+  @@index([productId])
+}
+
+// ============================================
+// PRODUCT STATUS ENUM (for future enhancement)
+// ============================================
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  OUT_OF_STOCK
+  ERROR
+  SYNCING
+  PENDING_APPROVAL
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,14 +21,34 @@ import {
 export default function AdminDashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/')
-    } else if (status === 'authenticated' && session?.user?.role !== 'ADMIN') {
-      router.push('/dashboard')
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'ADMIN') {
+        router.push('/dashboard')
+      } else {
+        fetchStats()
+      }
     }
   }, [status, session])
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats')
+      const data = await res.json()
+      if (res.ok) {
+        setStats(data)
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (status === 'loading') {
     return (
@@ -81,7 +101,7 @@ export default function AdminDashboardPage() {
       icon: Store,
       href: '/admin/stores',
       color: 'from-orange-600 to-red-600',
-      badge: 'Coming Soon'
+      badge: null
     },
     {
       title: 'Product Analytics',
@@ -89,7 +109,7 @@ export default function AdminDashboardPage() {
       icon: BarChart3,
       href: '/admin/analytics',
       color: 'from-indigo-600 to-blue-600',
-      badge: 'Coming Soon'
+      badge: null
     },
     {
       title: 'System Health',
@@ -97,7 +117,7 @@ export default function AdminDashboardPage() {
       icon: Package,
       href: '/admin/health',
       color: 'from-gray-600 to-slate-600',
-      badge: 'Coming Soon'
+      badge: null
     },
   ]
 
@@ -183,7 +203,9 @@ export default function AdminDashboardPage() {
           <Card className="border-blue-100 bg-white/80">
             <CardHeader className="pb-2">
               <CardDescription>Total Users</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+              <CardTitle className="text-3xl text-blue-600">
+                {loading ? '...' : stats?.totalUsers || 0}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-gray-600">Active users</p>
@@ -193,7 +215,9 @@ export default function AdminDashboardPage() {
           <Card className="border-blue-100 bg-white/80">
             <CardHeader className="pb-2">
               <CardDescription>Connected Stores</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+              <CardTitle className="text-3xl text-blue-600">
+                {loading ? '...' : stats?.totalStores || 0}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-gray-600">OAuth connections</p>
@@ -203,7 +227,9 @@ export default function AdminDashboardPage() {
           <Card className="border-blue-100 bg-white/80">
             <CardHeader className="pb-2">
               <CardDescription>Total Products</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">-</CardTitle>
+              <CardTitle className="text-3xl text-blue-600">
+                {loading ? '...' : stats?.totalProducts?.toLocaleString() || 0}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-gray-600">Across all stores</p>
@@ -213,7 +239,9 @@ export default function AdminDashboardPage() {
           <Card className="border-blue-100 bg-white/80">
             <CardHeader className="pb-2">
               <CardDescription>Monthly Revenue</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">$0</CardTitle>
+              <CardTitle className="text-3xl text-blue-600">
+                ${loading ? '...' : stats?.monthlyRevenue?.toFixed(2) || '0.00'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-gray-600">Subscription income</p>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { saveQuote, generateQuoteId } from '@/lib/bigcommerce-app/storage'
+import { sendEmail } from '@/lib/email/send'
+import { db } from '@/lib/db'
 import type { QuoteRequest, QuoteSubmission } from '@/types/bigcommerce-app'
 
 /**
@@ -68,8 +70,52 @@ export async function POST(request: NextRequest) {
     
     console.log('Quote saved:', quoteId)
     
-    // TODO: Send email notifications here
-    // await sendQuoteEmails(quote)
+    // Send email notifications
+    try {
+      // Send confirmation to customer
+      await sendEmail({
+        to: quote.customer.email,
+        subject: `Quote Request Received - ${quoteId}`,
+        template: 'quote_received',
+        data: {
+          customerName: quote.customer.name,
+          quoteId: quote.id,
+          productName: quote.product.name,
+          quantity: quote.quantity,
+          notes: quote.notes,
+          phone: quote.customer.phone
+        }
+      }).catch(err => console.error('Failed to send customer quote email:', err))
+
+      // Send notification to admin/support
+      const supportEmail = await db.settings.findUnique({
+        where: { key: 'support_email' }
+      })
+      
+      if (supportEmail?.value) {
+        await sendEmail({
+          to: supportEmail.value,
+          subject: `New Quote Request - ${quoteId}`,
+          template: 'quote_admin_notification',
+          data: {
+            quoteId: quote.id,
+            customerName: quote.customer.name,
+            customerEmail: quote.customer.email,
+            customerPhone: quote.customer.phone,
+            customerCompany: quote.customer.company,
+            productName: quote.product.name,
+            productSku: quote.product.sku,
+            quantity: quote.quantity,
+            notes: quote.notes
+          }
+        }).catch(err => console.error('Failed to send admin quote email:', err))
+      }
+      
+      console.log(`✅ Quote emails sent for ${quoteId}`)
+    } catch (emailError) {
+      console.error('Error sending quote emails:', emailError)
+      // Don't fail the quote submission if email fails
+    }
     
     return NextResponse.json({
       success: true,

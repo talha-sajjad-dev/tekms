@@ -100,6 +100,7 @@ export default function StoreProductsPage() {
   // Dialogs
   const [showBulkDelete, setShowBulkDelete] = useState(false)
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false)
+  const [showBulkImageAdd, setShowBulkImageAdd] = useState(false)
   const [showImageEdit, setShowImageEdit] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   
@@ -107,6 +108,7 @@ export default function StoreProductsPage() {
   const [bulkPriceAction, setBulkPriceAction] = useState<"increase" | "decrease" | "set">("increase")
   const [bulkPriceValue, setBulkPriceValue] = useState("")
   const [bulkPriceUnit, setBulkPriceUnit] = useState<"percent" | "fixed">("percent")
+  const [bulkImageUrl, setBulkImageUrl] = useState("")
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -219,13 +221,40 @@ export default function StoreProductsPage() {
   }
 
   const handleBulkDelete = async () => {
-    toast({
-      title: "Bulk Delete",
-      description: `Deleting ${selectedProducts.size} products... (This would call the API)`,
-    })
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          productIds: Array.from(selectedProducts)
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: `Deleted ${data.affected} products`,
+        })
+        fetchProducts(currentPage)
+        setSelectedProducts(new Set())
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to delete products",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete products",
+        variant: "destructive",
+      })
+    }
     setShowBulkDelete(false)
-    setSelectedProducts(new Set())
-    // TODO: Implement actual bulk delete API call
   }
 
   const handleBulkPriceEdit = async () => {
@@ -239,19 +268,129 @@ export default function StoreProductsPage() {
       return
     }
 
-    toast({
-      title: "Bulk Price Update",
-      description: `Updating prices for ${selectedProducts.size} products... (This would call the API)`,
-    })
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_price',
+          productIds: Array.from(selectedProducts),
+          priceAction: bulkPriceAction,
+          priceValue: value,
+          priceUnit: bulkPriceUnit
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: `Updated prices for ${data.affected} products`,
+        })
+        fetchProducts(currentPage)
+        setSelectedProducts(new Set())
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update prices",
+          variant: "destructive",
+        })
+        if (data.upgrade) {
+          toast({
+            title: "Upgrade Required",
+            description: "This feature requires a premium plan",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update prices",
+        variant: "destructive",
+      })
+    }
     setShowBulkPriceEdit(false)
-    setSelectedProducts(new Set())
-    // TODO: Implement actual bulk price update API call
+  }
+
+  const handleBulkImageAdd = async () => {
+    if (!bulkImageUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an image URL",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_image',
+          productIds: Array.from(selectedProducts),
+          imageUrl: bulkImageUrl
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast({
+          title: "Success",
+          description: `Added images to ${data.affected} products`,
+        })
+        fetchProducts(currentPage)
+        setSelectedProducts(new Set())
+        setBulkImageUrl("")
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to add images",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add images",
+        variant: "destructive",
+      })
+    }
+    setShowBulkImageAdd(false)
   }
 
   const getProductImage = (product: Product) => {
-    if (product.images?.images && product.images.images.length > 0) {
-      return product.images.images[0].url_thumbnail || product.images.images[0].url_standard
+    try {
+      // Handle different image data structures
+      if (product.images) {
+        // If images is an object with images array
+        if (product.images.images && Array.isArray(product.images.images) && product.images.images.length > 0) {
+          const img = product.images.images[0]
+          return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+        }
+        // If images is directly an array
+        if (Array.isArray(product.images) && product.images.length > 0) {
+          const img = product.images[0]
+          return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+        }
+        // If images has a direct URL property
+        if (product.images.url) {
+          return product.images.url
+        }
+      }
+      
+      // Try platformData as fallback
+      if (product.platformData?.images && Array.isArray(product.platformData.images) && product.platformData.images.length > 0) {
+        const img = product.platformData.images[0]
+        return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+      }
+    } catch (error) {
+      console.error("Error getting product image:", error, product)
     }
+    
     return "/placeholder.jpg"
   }
 
@@ -267,7 +406,7 @@ export default function StoreProductsPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
+        <div className="px-6 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.push(`/stores/${storeId}`)}>
               <ArrowLeft className="h-5 w-5" />
@@ -286,7 +425,7 @@ export default function StoreProductsPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="px-6 py-6">
         {/* Filters and Search */}
         <Card className="mb-6">
           <CardHeader>
@@ -360,6 +499,14 @@ export default function StoreProductsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setShowBulkImageAdd(true)}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Add Image
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setShowBulkPriceEdit(true)}
                   >
                     <DollarSign className="h-4 w-4 mr-2" />
@@ -412,12 +559,12 @@ export default function StoreProductsPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {filteredProducts.map((product) => (
                   <div
                     key={product.id}
-                    className={`flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors ${
-                      selectedProducts.has(product.id) ? "bg-accent/30 border-primary" : ""
+                    className={`flex items-center gap-3 p-3 border rounded hover:bg-accent/30 transition-colors ${
+                      selectedProducts.has(product.id) ? "bg-accent/20 border-primary" : ""
                     }`}
                   >
                     <Checkbox
@@ -428,38 +575,39 @@ export default function StoreProductsPage() {
                     <img
                       src={getProductImage(product)}
                       alt={product.name}
-                      className="w-16 h-16 object-cover rounded"
+                      className="w-12 h-12 object-cover rounded bg-gray-100"
+                      loading="lazy"
                       onError={(e) => {
-                        e.currentTarget.src = "/placeholder.jpg"
+                        const target = e.currentTarget
+                        // Prevent infinite loop
+                        if (target.src !== window.location.origin + "/placeholder.jpg") {
+                          target.src = "/placeholder.jpg"
+                        }
                       }}
                     />
                     
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{product.name}</h3>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">{product.name}</h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {product.sku && <span>SKU: {product.sku}</span>}
-                        <span>ID: {product.externalId}</span>
-                        {product.syncStatus && (
-                          <Badge variant="outline" className="text-xs">
-                            {product.syncStatus}
-                          </Badge>
-                        )}
+                        <span className="hidden sm:inline">ID: {product.externalId}</span>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className="font-bold text-lg">${product.price.toFixed(2)}</div>
+                      <div className="font-bold">${product.price.toFixed(2)}</div>
                       {product.compareAtPrice && (
-                        <div className="text-sm text-muted-foreground line-through">
+                        <div className="text-xs text-muted-foreground line-through">
                           ${product.compareAtPrice.toFixed(2)}
                         </div>
                       )}
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={() => {
                           setEditingProduct(product)
                           setShowImageEdit(true)
@@ -468,14 +616,13 @@ export default function StoreProductsPage() {
                         <ImageIcon className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         onClick={() => {
-                          toast({
-                            title: "Edit Product",
-                            description: "Product editor would open here",
-                          })
+                          router.push(`/stores/${storeId}/products/${product.id}/edit`)
                         }}
+                        title="Edit product"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -548,6 +695,61 @@ export default function StoreProductsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Bulk Image Add Dialog */}
+      <Dialog open={showBulkImageAdd} onOpenChange={setShowBulkImageAdd}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Image to Products</DialogTitle>
+            <DialogDescription>
+              Add an image URL to {selectedProducts.size} selected products
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Image URL</Label>
+              <Input
+                type="url"
+                placeholder="https://example.com/image.jpg"
+                value={bulkImageUrl}
+                onChange={(e) => setBulkImageUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the full URL of the image you want to add to all selected products
+              </p>
+            </div>
+            
+            {bulkImageUrl && (
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                <div className="border rounded p-2">
+                  <img
+                    src={bulkImageUrl}
+                    alt="Preview"
+                    className="w-full h-48 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.src = "/placeholder.jpg"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowBulkImageAdd(false)
+              setBulkImageUrl("")
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkImageAdd}>
+              Add to {selectedProducts.size} Products
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Bulk Price Edit Dialog */}
       <Dialog open={showBulkPriceEdit} onOpenChange={setShowBulkPriceEdit}>

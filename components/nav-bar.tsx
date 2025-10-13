@@ -10,6 +10,8 @@ export function NavBar() {
   const links = [
     { href: "/", label: "Product Manager" },
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/products", label: "Products" },
+    { href: "/stores", label: "Stores" },
     // Hidden: { href: "/modifiers", label: "Add Modifiers" },
     // Hidden: { href: "/catalog-pricing-fix", label: "Catalog Pricing Fix" },
     // Hidden: { href: "/clear-pricing", label: "Clear Pricing" },

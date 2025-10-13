@@ -10,12 +10,21 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { 
-  Users, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Users,
+  Search,
+  Edit,
+  Trash2,
   Save,
   ArrowLeft,
   Shield,
@@ -23,7 +32,8 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
-  Crown
+  Crown,
+  Gift
 } from 'lucide-react'
 
 interface User {
@@ -64,11 +74,19 @@ export default function AdminUsersPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showGiftDialog, setShowGiftDialog] = useState(false)
+  const [giftingUser, setGiftingUser] = useState<User | null>(null)
   
   const [formData, setFormData] = useState({
     role: 'USER' as 'USER' | 'ADMIN',
     allowLegacyEtsyImport: false,
     allowLegacyTikTokExport: false
+  })
+  
+  const [giftData, setGiftData] = useState({
+    tier: 'PAID',
+    duration: 1,
+    note: ''
   })
 
   useEffect(() => {
@@ -192,6 +210,48 @@ export default function AdminUsersPage() {
         description: 'Failed to delete user',
         variant: 'destructive'
       })
+    }
+  }
+  
+  const handleGiftSubscription = async () => {
+    if (!giftingUser) return
+    
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/subscriptions/gift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: giftingUser.id,
+          ...giftData
+        })
+      })
+
+      if (res.ok) {
+        toast({
+          title: 'Subscription Gifted!',
+          description: `${giftingUser.email} now has ${giftData.tier} for ${giftData.duration} month(s)`
+        })
+        setShowGiftDialog(false)
+        setGiftingUser(null)
+        setGiftData({ tier: 'PAID', duration: 1, note: '' })
+        fetchUsers()
+      } else {
+        const data = await res.json()
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to gift subscription',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to gift subscription',
+        variant: 'destructive'
+      })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -329,17 +389,29 @@ export default function AdminUsersPage() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600"
+                        onClick={() => {
+                          setGiftingUser(user)
+                          setShowGiftDialog(true)
+                        }}
+                      >
+                        <Gift className="h-4 w-4 mr-2" />
+                        Gift Sub
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(user)}
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
                       {user.id !== session?.user?.id && (
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(user.id, user.email)}
                         >
@@ -480,6 +552,78 @@ export default function AdminUsersPage() {
           </Card>
         )}
       </div>
+
+      {/* Gift Subscription Dialog */}
+      <Dialog open={showGiftDialog} onOpenChange={setShowGiftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gift Subscription</DialogTitle>
+            <DialogDescription>
+              Gift a premium subscription to {giftingUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Subscription Tier</Label>
+              <Select value={giftData.tier} onValueChange={(v) => setGiftData({...giftData, tier: v})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PAID">Professional (Paid)</SelectItem>
+                  <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Duration</Label>
+              <Select value={giftData.duration.toString()} onValueChange={(v) => setGiftData({...giftData, duration: parseInt(v)})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Month</SelectItem>
+                  <SelectItem value="3">3 Months</SelectItem>
+                  <SelectItem value="12">12 Months (1 Year)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Note (Optional)</Label>
+              <Textarea
+                placeholder="Add a note for the user..."
+                value={giftData.note}
+                onChange={(e) => setGiftData({...giftData, note: e.target.value})}
+                rows={3}
+              />
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-sm text-blue-900">
+                <strong>Summary:</strong> {giftingUser?.email} will receive {giftData.tier} tier access for {giftData.duration} month(s).
+                They will be notified via email.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGiftDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGiftSubscription}
+              disabled={saving}
+              className="bg-gradient-to-r from-blue-500 to-purple-500"
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              {saving ? 'Gifting...' : 'Gift Subscription'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

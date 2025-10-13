@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { rateLimitedFetch, logRateLimitStatus } from '@/lib/bigcommerce/rate-limiter'
+import { canPerformAction, checkFeatureAccess } from '@/lib/subscription/enforcement'
 
 /**
  * Sync products from store
@@ -43,6 +44,30 @@ export async function POST(
         { error: 'Store is inactive' },
         { status: 400 }
       )
+    }
+    
+    // Check subscription limits for platform access
+    const platformCheck = await canPerformAction(session.user.id, {
+      type: 'add_product',
+      platform: store.platform as any
+    })
+    
+    if (!platformCheck.allowed) {
+      return NextResponse.json(
+        { error: platformCheck.reason || 'Platform access denied' },
+        { status: 403 }
+      )
+    }
+    
+    // Check if background sync is allowed (premium feature)
+    if (background) {
+      const hasScheduledSync = await checkFeatureAccess(session.user.id, 'scheduled')
+      if (!hasScheduledSync) {
+        return NextResponse.json({
+          error: 'Background sync is a premium feature. Please upgrade your plan.',
+          upgrade: true
+        }, { status: 403 })
+      }
     }
     
     // Check if there's already a sync job running
@@ -175,16 +200,200 @@ async function performSync(store: any, jobId: string): Promise<number> {
   }
 }
 
-// Platform-specific sync functions (placeholders for now)
+// Platform-specific sync functions
 async function syncShopifyProducts(store: any, accessToken: string): Promise<number> {
-  // Will implement full Shopify product import
-  // For now, just return mock count
-  return 0
+  try {
+    const shopDomain = store.storeUrl || store.externalStoreId
+    let allProducts: any[] = []
+    let nextPageInfo: string | null = null
+    let hasNextPage = true
+    
+    console.log(`🔄 Starting Shopify product sync for store: ${store.storeName}`)
+    
+    while (hasNextPage) {
+      const url = nextPageInfo
+        ? `https://${shopDomain}/admin/api/2024-01/products.json?limit=250&page_info=${nextPageInfo}`
+        : `https://${shopDomain}/admin/api/2024-01/products.json?limit=250`
+      
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Shopify products: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      allProducts = [...allProducts, ...(data.products || [])]
+      
+      // Shopify uses Link header for pagination
+      const linkHeader = response.headers.get('Link')
+      nextPageInfo = linkHeader?.match(/<[^>]*page_info=([^&>]+)/)?.[1] || null
+      hasNextPage = !!nextPageInfo
+      
+      console.log(`✓ Fetched ${data.products?.length || 0} products (Total: ${allProducts.length})`)
+    }
+    
+    console.log(`📊 Total Shopify products fetched: ${allProducts.length}`)
+    
+    // Save to database
+    let syncedCount = 0
+    for (const shopifyProduct of allProducts) {
+      try {
+        const existing = await db.product.findFirst({
+          where: {
+            userId: store.userId,
+            platform: 'SHOPIFY',
+            externalId: shopifyProduct.id.toString(),
+            storeConnectionId: store.id
+          }
+        })
+        
+        const productData = {
+          userId: store.userId,
+          platform: 'SHOPIFY' as const,
+          externalId: shopifyProduct.id.toString(),
+          storeConnectionId: store.id,
+          importMethod: 'oauth',
+          name: shopifyProduct.title,
+          description: shopifyProduct.body_html || null,
+          sku: shopifyProduct.variants?.[0]?.sku || null,
+          price: parseFloat(shopifyProduct.variants?.[0]?.price || '0'),
+          compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price
+            ? parseFloat(shopifyProduct.variants[0].compare_at_price)
+            : null,
+          categories: shopifyProduct.product_type ? [shopifyProduct.product_type] : [],
+          tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
+          images: shopifyProduct.images ? { images: shopifyProduct.images } : undefined,
+          variants: shopifyProduct.variants ? { variants: shopifyProduct.variants } : undefined,
+          platformData: shopifyProduct,
+          lastSyncedAt: new Date(),
+          syncStatus: 'synced'
+        }
+        
+        if (existing) {
+          await db.product.update({ where: { id: existing.id }, data: productData })
+        } else {
+          await db.product.create({ data: productData })
+        }
+        
+        syncedCount++
+      } catch (productError) {
+        console.error(`❌ Failed to sync Shopify product ${shopifyProduct.id}:`, productError)
+      }
+    }
+    
+    await db.storeConnection.update({
+      where: { id: store.id },
+      data: { productCount: syncedCount }
+    })
+    
+    console.log(`✅ Shopify sync complete! ${syncedCount} products synced`)
+    return syncedCount
+  } catch (error) {
+    console.error('Shopify sync error:', error)
+    throw error
+  }
 }
 
 async function syncEtsyProducts(store: any, accessToken: string): Promise<number> {
-  // Will implement Etsy product import
-  return 0
+  try {
+    const shopId = store.externalStoreId
+    let allProducts: any[] = []
+    let offset = 0
+    const limit = 100
+    
+    console.log(`🔄 Starting Etsy product sync for store: ${store.storeName}`)
+    
+    while (true) {
+      const response = await fetch(
+        `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'x-api-key': process.env.ETSY_API_KEY || '',
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Etsy products: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      const products = data.results || []
+      
+      if (products.length === 0) break
+      
+      allProducts = [...allProducts, ...products]
+      offset += limit
+      
+      console.log(`✓ Fetched ${products.length} products (Total: ${allProducts.length})`)
+      
+      if (products.length < limit) break
+    }
+    
+    console.log(`📊 Total Etsy products fetched: ${allProducts.length}`)
+    
+    // Save to database
+    let syncedCount = 0
+    for (const etsyProduct of allProducts) {
+      try {
+        const existing = await db.product.findFirst({
+          where: {
+            userId: store.userId,
+            platform: 'ETSY',
+            externalId: etsyProduct.listing_id.toString(),
+            storeConnectionId: store.id
+          }
+        })
+        
+        const productData = {
+          userId: store.userId,
+          platform: 'ETSY' as const,
+          externalId: etsyProduct.listing_id.toString(),
+          storeConnectionId: store.id,
+          importMethod: 'oauth',
+          name: etsyProduct.title,
+          description: etsyProduct.description || null,
+          sku: etsyProduct.sku || null,
+          price: parseFloat(etsyProduct.price?.amount || '0') / 100, // Etsy uses cents
+          compareAtPrice: null,
+          categories: etsyProduct.taxonomy_id ? [etsyProduct.taxonomy_id.toString()] : [],
+          tags: etsyProduct.tags || [],
+          images: etsyProduct.images ? { images: etsyProduct.images } : undefined,
+          platformData: etsyProduct,
+          lastSyncedAt: new Date(),
+          syncStatus: 'synced'
+        }
+        
+        if (existing) {
+          await db.product.update({ where: { id: existing.id }, data: productData })
+        } else {
+          await db.product.create({ data: productData })
+        }
+        
+        syncedCount++
+      } catch (productError) {
+        console.error(`❌ Failed to sync Etsy product ${etsyProduct.listing_id}:`, productError)
+      }
+    }
+    
+    await db.storeConnection.update({
+      where: { id: store.id },
+      data: { productCount: syncedCount }
+    })
+    
+    console.log(`✅ Etsy sync complete! ${syncedCount} products synced`)
+    return syncedCount
+  } catch (error) {
+    console.error('Etsy sync error:', error)
+    throw error
+  }
 }
 
 async function syncBigCommerceProducts(store: any, accessToken: string): Promise<number> {
@@ -310,6 +519,100 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
 }
 
 async function syncTikTokProducts(store: any, accessToken: string): Promise<number> {
-  // Will implement TikTok product import
-  return 0
+  try {
+    const shopId = store.externalStoreId
+    let allProducts: any[] = []
+    let pageToken: string | null = null
+    
+    console.log(`🔄 Starting TikTok product sync for store: ${store.storeName}`)
+    
+    while (true) {
+      const url = pageToken
+        ? `https://open-api.tiktokglobalshop.com/product/202309/products/search?page_size=100&page_token=${pageToken}`
+        : `https://open-api.tiktokglobalshop.com/product/202309/products/search?page_size=100`
+      
+      const response = await fetch(url, {
+        headers: {
+          'x-tts-access-token': accessToken,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch TikTok products: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      const products = data.data?.products || []
+      
+      if (products.length === 0) break
+      
+      allProducts = [...allProducts, ...products]
+      pageToken = data.data?.next_page_token || null
+      
+      console.log(`✓ Fetched ${products.length} products (Total: ${allProducts.length})`)
+      
+      if (!pageToken) break
+    }
+    
+    console.log(`📊 Total TikTok products fetched: ${allProducts.length}`)
+    
+    // Save to database
+    let syncedCount = 0
+    for (const tiktokProduct of allProducts) {
+      try {
+        const existing = await db.product.findFirst({
+          where: {
+            userId: store.userId,
+            platform: 'TIKTOK',
+            externalId: tiktokProduct.id.toString(),
+            storeConnectionId: store.id
+          }
+        })
+        
+        const productData = {
+          userId: store.userId,
+          platform: 'TIKTOK' as const,
+          externalId: tiktokProduct.id.toString(),
+          storeConnectionId: store.id,
+          importMethod: 'oauth',
+          name: tiktokProduct.title,
+          description: tiktokProduct.description || null,
+          sku: tiktokProduct.skus?.[0]?.seller_sku || null,
+          price: parseFloat(tiktokProduct.skus?.[0]?.price?.amount || '0'),
+          compareAtPrice: tiktokProduct.skus?.[0]?.original_price?.amount
+            ? parseFloat(tiktokProduct.skus[0].original_price.amount)
+            : null,
+          categories: tiktokProduct.category_chains ? [tiktokProduct.category_chains[0]?.local_name || ''] : [],
+          tags: [],
+          images: tiktokProduct.images ? { images: tiktokProduct.images } : undefined,
+          variants: tiktokProduct.skus ? { skus: tiktokProduct.skus } : undefined,
+          platformData: tiktokProduct,
+          lastSyncedAt: new Date(),
+          syncStatus: 'synced'
+        }
+        
+        if (existing) {
+          await db.product.update({ where: { id: existing.id }, data: productData })
+        } else {
+          await db.product.create({ data: productData })
+        }
+        
+        syncedCount++
+      } catch (productError) {
+        console.error(`❌ Failed to sync TikTok product ${tiktokProduct.id}:`, productError)
+      }
+    }
+    
+    await db.storeConnection.update({
+      where: { id: store.id },
+      data: { productCount: syncedCount }
+    })
+    
+    console.log(`✅ TikTok sync complete! ${syncedCount} products synced`)
+    return syncedCount
+  } catch (error) {
+    console.error('TikTok sync error:', error)
+    throw error
+  }
 }

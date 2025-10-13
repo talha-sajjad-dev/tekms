@@ -1,45 +1,64 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { 
-  Package, 
-  Search, 
-  Filter,
+import { BulkPriceDialog } from '@/components/products/BulkPriceDialog'
+import { BulkTagDialog } from '@/components/products/BulkTagDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Package,
+  Search,
+  RefreshCw,
+  X,
+  Download,
+  Edit,
+  CheckCircle2,
+  AlertCircle,
+  Home,
   ChevronLeft,
   ChevronRight,
-  Trash2,
-  Download,
-  RefreshCw,
-  ArrowUpDown,
-  X,
-  Store as StoreIcon,
-  DollarSign
+  Save
 } from 'lucide-react'
 
 interface Product {
   id: string
-  name: string
-  description: string | null
-  sku: string | null
-  price: string
-  compareAtPrice: string | null
-  platform: string
   externalId: string
-  importMethod: string
-  categories: string[]
-  tags: string[]
+  name: string
+  sku: string | null
+  price: number
+  compareAtPrice: number | null
+  platform: string
   images: any
+  tags: string[]
+  categories: string[]
+  syncStatus: string | null
+  lastSyncedAt: string | null
   createdAt: string
+  updatedAt: string
+  platformData: any
   storeConnection: {
     id: string
     platform: string
@@ -53,6 +72,15 @@ interface StoreConnection {
   platform: string
   storeName: string
   productCount: number
+  syncStatus: string | null
+  lastSyncedAt: string | null
+}
+
+interface SavedFilter {
+  id: string
+  name: string
+  useCount: number
+  filters: any
 }
 
 export default function ProductsPage() {
@@ -62,25 +90,38 @@ export default function ProductsPage() {
   
   const [products, setProducts] = useState<Product[]>([])
   const [stores, setStores] = useState<StoreConnection[]>([])
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set())
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set())
+  
+  // Dialogs
+  const [showPriceDialog, setShowPriceDialog] = useState(false)
+  const [showTagDialog, setShowTagDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [showSyncPreview, setShowSyncPreview] = useState(false)
+  const [syncPreviewData, setSyncPreviewData] = useState<any>(null)
+  const [bulkOperating, setBulkOperating] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  
+  // Quick edit state
+  const [editedName, setEditedName] = useState('')
+  const [editedPrice, setEditedPrice] = useState('')
+  const [editedTags, setEditedTags] = useState('')
+  const [saving, setSaving] = useState(false)
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedPlatform, setSelectedPlatform] = useState('all')
-  const [selectedStore, setSelectedStore] = useState('all')
-  const [minPrice, setMinPrice] = useState('')
-  const [maxPrice, setMaxPrice] = useState('')
-  const [sortBy, setSortBy] = useState('createdAt')
-  const [sortOrder, setSortOrder] = useState('desc')
-  const [showFilters, setShowFilters] = useState(false)
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([])
+  const [quickFilter, setQuickFilter] = useState<'all' | 'synced' | 'drafts' | 'errors' | 'pending'>('all')
   
   // Pagination
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [totalProducts, setTotalProducts] = useState(0)
-  const limit = 50
+  const [total, setTotal] = useState(0)
+  const limit = 100
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -88,27 +129,49 @@ export default function ProductsPage() {
     } else if (status === 'authenticated') {
       fetchStores()
       fetchProducts()
+      fetchSavedFilters()
     }
   }, [status, page])
 
   useEffect(() => {
-    // Debounce search
     const timer = setTimeout(() => {
       if (status === 'authenticated') {
-        setPage(1) // Reset to page 1 on filter change
+        setPage(1)
         fetchProducts()
       }
-    }, 500)
+    }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, selectedPlatform, selectedStore, minPrice, maxPrice, sortBy, sortOrder])
+  }, [searchQuery, selectedStoreIds, quickFilter])
+
+  // Set edit fields when product selected
+  useEffect(() => {
+    if (selectedProduct) {
+      setEditedName(selectedProduct.name)
+      setEditedPrice(selectedProduct.price.toString())
+      setEditedTags(selectedProduct.tags.join(', '))
+    }
+  }, [selectedProduct])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      if (e.key === '/') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[type="text"]')?.focus()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [])
 
   const fetchStores = async () => {
     try {
       const res = await fetch('/api/stores')
       const data = await res.json()
-      if (res.ok) {
-        setStores(data.stores || [])
-      }
+      if (res.ok) setStores(data.stores || [])
     } catch (error) {
       console.error('Error fetching stores:', error)
     }
@@ -117,452 +180,959 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setSearching(true)
     try {
+      const syncStatusFilter = quickFilter === 'synced' ? 'synced' : 
+                              quickFilter === 'errors' ? 'error' :
+                              quickFilter === 'pending' ? 'pending' : ''
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         search: searchQuery,
-        platform: selectedPlatform,
-        storeId: selectedStore,
-        minPrice,
-        maxPrice,
-        sortBy,
-        sortOrder
+        storeIds: selectedStoreIds.join(','),
+        syncStatus: syncStatusFilter
       })
 
-      const res = await fetch(`/api/products?${params}`)
+      const res = await fetch(`/api/products/unified?${params}`)
       const data = await res.json()
       
       if (res.ok) {
         setProducts(data.products || [])
         setTotalPages(data.pagination?.pages || 1)
-        setTotalProducts(data.pagination?.total || 0)
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to fetch products',
-          variant: 'destructive'
-        })
+        setTotal(data.pagination?.total || 0)
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch products',
-        variant: 'destructive'
-      })
+      console.error('Error:', error)
     } finally {
       setLoading(false)
       setSearching(false)
     }
   }
 
-  const toggleSelectProduct = (productId: string) => {
+  const fetchSavedFilters = async () => {
+    try {
+      const res = await fetch('/api/filters')
+      const data = await res.json()
+      if (res.ok) setSavedFilters((data.filters || []).slice(0, 4))
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedProducts)
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
     } else {
-      newSelected.add(productId)
+      newSelected.add(id)
     }
     setSelectedProducts(newSelected)
   }
 
   const toggleSelectAll = () => {
-    if (selectedProducts.size === products.length) {
+    if (selectedProducts.size === products.length && products.length > 0) {
       setSelectedProducts(new Set())
+      setSelectedProduct(null)
     } else {
       setSelectedProducts(new Set(products.map(p => p.id)))
     }
   }
 
-  const handleBulkDelete = async () => {
-    if (selectedProducts.size === 0) return
+  const handleQuickSave = async () => {
+    if (!selectedProduct) return
     
-    if (!confirm(`Delete ${selectedProducts.size} product(s)? This cannot be undone.`)) return
-
+    setSaving(true)
     try {
-      const res = await fetch('/api/products', {
-        method: 'POST',
+      const res = await fetch(`/api/products/${selectedProduct.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'delete',
-          productIds: Array.from(selectedProducts)
+          name: editedName,
+          price: parseFloat(editedPrice),
+          tags: editedTags.split(',').map(t => t.trim()).filter(Boolean)
         })
       })
 
       if (res.ok) {
-        toast({
-          title: 'Success',
-          description: `Deleted ${selectedProducts.size} product(s)`
-        })
-        setSelectedProducts(new Set())
+        toast({ title: 'Saved', description: 'Product updated successfully' })
         fetchProducts()
       } else {
-        const data = await res.json()
+        toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSyncClick = () => {
+    if (stores.length === 0) {
+      toast({
+        title: 'No Stores Connected',
+        description: 'Please connect a store first to sync products',
+        variant: 'destructive'
+      })
+      setTimeout(() => router.push('/stores'), 1000)
+      return
+    }
+    
+    if (stores.length === 1) {
+      // Preview sync for the only store
+      handlePreviewSync(stores[0].id)
+    } else {
+      // Show store selection dialog
+      setShowSyncDialog(true)
+    }
+  }
+
+  const handlePreviewSync = async (storeId: string) => {
+    setShowSyncDialog(false)
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/stores/${storeId}/preview`)
+      const data = await res.json()
+      
+      if (res.ok) {
+        setSyncPreviewData({...data, storeId})
+        setShowSyncPreview(true)
+      } else {
+        toast({ title: 'Error', description: 'Failed to preview sync', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to preview sync', variant: 'destructive' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleConfirmSync = async () => {
+    if (!syncPreviewData) return
+    
+    setShowSyncPreview(false)
+    setSyncing(true)
+    try {
+      toast({ title: 'Syncing...', description: 'Please wait while we sync your products' })
+      
+      const res = await fetch(`/api/stores/${syncPreviewData.storeId}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ background: false })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        toast({ title: 'Sync Complete', description: `Synced ${data.productCount || 0} products` })
+        fetchStores()
+        fetchProducts()
+        setSyncPreviewData(null)
+      } else {
+        toast({ title: 'Sync Failed', description: data.error || 'Failed to sync', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to sync', variant: 'destructive' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const applyFilter = (filter: SavedFilter) => {
+    const config = filter.filters as any
+    setSearchQuery(config.search || '')
+    setSelectedStoreIds(config.storeIds || [])
+    setQuickFilter('all')
+    toast({ title: 'Filter Applied', description: `Applied "${filter.name}"` })
+  }
+
+  const handleBulkPrice = async (action: string, value: number, unit: string) => {
+    console.log('💰 Updating prices:', Array.from(selectedProducts), { action, value, unit })
+    setBulkOperating(true)
+    try {
+      const res = await fetch('/api/products/unified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'update_price',
+          productIds: Array.from(selectedProducts),
+          changes: { action, value, unit }
+        })
+      })
+
+      const data = await res.json()
+      console.log('Price update response:', data)
+
+      if (res.ok) {
+        toast({ title: 'Success', description: `Updated ${data.successItems} products` })
+        fetchProducts()
+        setSelectedProducts(new Set())
+      } else {
+        toast({ title: 'Failed', description: data.error || 'Check console', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Price update error:', error)
+      toast({ title: 'Error', description: 'Network error', variant: 'destructive' })
+    } finally {
+      setBulkOperating(false)
+    }
+  }
+
+  const handleBulkTags = async (action: string, tags: string[]) => {
+    console.log('🏷️ Updating tags:', Array.from(selectedProducts), { action, tags })
+    setBulkOperating(true)
+    try {
+      const res = await fetch('/api/products/unified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'update_tags',
+          productIds: Array.from(selectedProducts),
+          changes: { action, tags }
+        })
+      })
+
+      const data = await res.json()
+      console.log('Tag update response:', data)
+
+      if (res.ok) {
+        toast({ title: 'Success', description: `Updated ${data.successItems} products` })
+        fetchProducts()
+        setSelectedProducts(new Set())
+      } else {
+        toast({ title: 'Failed', description: data.error || 'Check console', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Tag update error:', error)
+      toast({ title: 'Error', description: 'Network error', variant: 'destructive' })
+    } finally {
+      setBulkOperating(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    console.log('🗑️ Deleting products:', Array.from(selectedProducts))
+    setBulkOperating(true)
+    try {
+      const res = await fetch('/api/products/unified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'delete',
+          productIds: Array.from(selectedProducts)
+        })
+      })
+
+      const data = await res.json()
+      console.log('Delete response:', data)
+
+      if (res.ok) {
+        toast({ title: 'Success', description: `Deleted ${data.successItems} products` })
+        fetchProducts()
+        setSelectedProducts(new Set())
+        setSelectedProduct(null)
+      } else {
+        console.error('Delete failed:', data)
         toast({
-          title: 'Error',
-          description: data.error || 'Failed to delete products',
+          title: 'Delete Failed',
+          description: data.error || 'Failed to delete products. Check console for details.',
           variant: 'destructive'
         })
       }
     } catch (error) {
+      console.error('Delete error:', error)
       toast({
         title: 'Error',
-        description: 'Failed to delete products',
+        description: 'Network error while deleting products',
         variant: 'destructive'
       })
+    } finally {
+      setBulkOperating(false)
+      setShowDeleteDialog(false)
     }
   }
 
-  const clearFilters = () => {
-    setSearchQuery('')
-    setSelectedPlatform('all')
-    setSelectedStore('all')
-    setMinPrice('')
-    setMaxPrice('')
-    setSortBy('createdAt')
-    setSortOrder('desc')
+  const handleExportCSV = () => {
+    const headers = ['Name', 'SKU', 'Price', 'Platform', 'Store', 'Tags', 'Status']
+    const rows = products
+      .filter(p => selectedProducts.has(p.id))
+      .map(p => [
+        p.name, p.sku || '', p.price.toString(), p.platform,
+        p.storeConnection?.storeName || 'Legacy', p.tags.join(';'), p.syncStatus || ''
+      ])
+
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `products-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast({ title: 'Exported', description: `${selectedProducts.size} products exported` })
   }
 
   const getPlatformColor = (platform: string) => {
     const colors: Record<string, string> = {
-      BIGCOMMERCE: 'bg-blue-100 text-blue-800',
-      SHOPIFY: 'bg-green-100 text-green-800',
-      ETSY: 'bg-orange-100 text-orange-800',
-      TIKTOK: 'bg-pink-100 text-pink-800'
+      BIGCOMMERCE: 'bg-blue-500',
+      SHOPIFY: 'bg-green-500',
+      ETSY: 'bg-orange-500',
+      TIKTOK: 'bg-pink-500'
     }
-    return colors[platform] || 'bg-gray-100 text-gray-800'
+    return colors[platform] || 'bg-gray-500'
   }
 
-  if (loading || status === 'loading') {
+  const getProductImage = (product: Product) => {
+    try {
+      if (product.images?.images && Array.isArray(product.images.images) && product.images.images.length > 0) {
+        const img = product.images.images[0]
+        return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+      }
+      if (Array.isArray(product.images) && product.images.length > 0) {
+        const img = product.images[0]
+        return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+      }
+      if (product.platformData?.images && Array.isArray(product.platformData.images)) {
+        const img = product.platformData.images[0]
+        return img.url_thumbnail || img.url_standard || img.url || "/placeholder.jpg"
+      }
+    } catch (e) {
+      console.error("Image error for", product.id, e)
+    }
+    return "/placeholder.jpg"
+  }
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading products...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
   }
 
+  const syncedCount = products.filter(p => p.syncStatus === 'synced').length
+  const errorCount = products.filter(p => p.syncStatus === 'error').length
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <header className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold">Products</h1>
-                <p className="text-sm text-muted-foreground">
-                  {totalProducts} total products across {stores.length} store{stores.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedProducts.size > 0 && (
-                <>
-                  <Badge variant="secondary">
-                    {selectedProducts.size} selected
-                  </Badge>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Selected
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchProducts}
-                disabled={searching}
-              >
-                <RefreshCw className={`h-4 w-4 ${searching ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Navigation Bar */}
+      <nav className="h-14 bg-white border-b flex items-center px-4 gap-4 shrink-0">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')}>
+          <Home className="h-4 w-4 mr-2" />
+          Dashboard
+        </Button>
+        <span className="text-muted-foreground">/</span>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/stores')}>
+          Stores
+        </Button>
+        <span className="text-muted-foreground">/</span>
+        <span className="font-medium">Products</span>
+        
+        <div className="flex-1" />
+        
+        <Button variant="outline" size="sm" onClick={() => router.push('/settings')}>
+          Settings
+        </Button>
+      </nav>
+
+      {/* Top Bar */}
+      <header className="h-16 border-b bg-white/80 backdrop-blur-sm flex items-center px-4 gap-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <Package className="h-8 w-8 text-blue-600" />
+          <div>
+            <h1 className="text-lg font-bold">Product Manager</h1>
+            <p className="text-xs text-muted-foreground">{total.toLocaleString()} products</p>
           </div>
+        </div>
+        
+        <div className="flex-1 max-w-2xl">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search title, SKU, tag, platform..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-16"
+            />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs bg-muted rounded border">/</kbd>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">Synced {syncedCount}</Badge>
+          <Badge variant="destructive">Errors {errorCount}</Badge>
+          <Button variant="outline" size="sm" onClick={fetchProducts} disabled={searching}>
+            <RefreshCw className={`h-4 w-4 ${searching ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Search Bar */}
-        <Card className="mb-4">
-          <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, SKU, or description..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+      {/* Main 3-Column Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar */}
+        <aside className="w-72 border-r bg-white p-3 overflow-y-auto shrink-0">
+          {/* Connections */}
+          <div className="mb-6">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+              Connections
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Advanced Filters */}
-        {showFilters && (
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between">
-                Advanced Filters
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear All
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Platform</Label>
-                  <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Platforms</SelectItem>
-                      <SelectItem value="BIGCOMMERCE">BigCommerce</SelectItem>
-                      <SelectItem value="SHOPIFY">Shopify</SelectItem>
-                      <SelectItem value="ETSY">Etsy</SelectItem>
-                      <SelectItem value="TIKTOK">TikTok</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Store</Label>
-                  <Select value={selectedStore} onValueChange={setSelectedStore}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Stores</SelectItem>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.storeName} ({store.productCount})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Sort By</Label>
-                  <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="createdAt">Date Added</SelectItem>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="price">Price</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Min Price</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Max Price</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="999.99"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Products Table */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="p-4 text-left">
-                      <Checkbox
-                        checked={selectedProducts.size === products.length && products.length > 0}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </th>
-                    <th className="p-4 text-left font-medium">Product</th>
-                    <th className="p-4 text-left font-medium">SKU</th>
-                    <th className="p-4 text-left font-medium">Price</th>
-                    <th className="p-4 text-left font-medium">Platform</th>
-                    <th className="p-4 text-left font-medium">Store</th>
-                    <th className="p-4 text-left font-medium">Added</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="p-4">
-                        <Checkbox
-                          checked={selectedProducts.has(product.id)}
-                          onCheckedChange={() => toggleSelectProduct(product.id)}
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-start gap-3">
-                          {product.images && (
-                            <div className="w-12 h-12 bg-muted rounded flex-shrink-0 overflow-hidden">
-                              {/* Placeholder for product image */}
-                              <div className="w-full h-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center">
-                                <Package className="h-6 w-6 text-blue-600" />
-                              </div>
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{product.name}</p>
-                            {product.description && (
-                              <p className="text-sm text-muted-foreground truncate max-w-md">
-                                {product.description}
-                              </p>
-                            )}
-                            {product.tags.length > 0 && (
-                              <div className="flex gap-1 mt-1 flex-wrap">
-                                {product.tags.slice(0, 3).map((tag, idx) => (
-                                  <Badge key={idx} variant="outline" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="font-mono text-sm">{product.sku || '-'}</span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">{parseFloat(product.price).toFixed(2)}</span>
-                        </div>
-                        {product.compareAtPrice && (
-                          <span className="text-xs text-muted-foreground line-through">
-                            ${parseFloat(product.compareAtPrice).toFixed(2)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <Badge className={getPlatformColor(product.platform)}>
-                          {product.platform}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1">
-                          <StoreIcon className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">
-                            {product.storeConnection?.storeName || 'Legacy Import'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-muted-foreground">
-                        {new Date(product.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {products.length === 0 && (
-              <div className="p-12 text-center">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No products found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {searchQuery || selectedPlatform !== 'all' || selectedStore !== 'all'
-                    ? 'Try adjusting your search or filters'
-                    : 'Connect a store to start importing products'}
-                </p>
-                {!searchQuery && selectedPlatform === 'all' && selectedStore === 'all' && (
-                  <Button onClick={() => router.push('/stores')}>
-                    <StoreIcon className="h-4 w-4 mr-2" />
+            <div className="space-y-2">
+              {stores.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  No stores connected
+                  <Button variant="link" size="sm" onClick={() => router.push('/stores')} className="block mx-auto mt-2">
                     Connect Store
                   </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalProducts)} of {totalProducts} products
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+                </div>
+              ) : (
+                stores.map(store => (
+                  <div
+                    key={store.id}
+                    className={`group flex items-center gap-2 p-2 rounded-lg border cursor-pointer hover:bg-accent/50 ${
+                      selectedStoreIds.includes(store.id) ? 'bg-accent border-primary' : 'bg-card'
+                    }`}
+                  >
+                    <div 
+                      className="flex-1 flex items-center gap-2"
+                      onClick={() => {
+                        setSelectedStoreIds(prev =>
+                          prev.includes(store.id) ? prev.filter(id => id !== store.id) : [...prev, store.id]
+                        )
+                      }}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${getPlatformColor(store.platform)}`} />
+                      <span className="text-sm flex-1 truncate">{store.storeName}</span>
+                      <span className="text-xs text-muted-foreground">{store.productCount}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handlePreviewSync(store.id)
+                      }}
+                      disabled={syncing}
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
-        )}
+
+          {/* Saved Filters */}
+          <div className="mb-6">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+              Saved Filters
+            </div>
+            <div className="space-y-2">
+              {savedFilters.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-2">No saved filters</div>
+              ) : (
+                savedFilters.map(filter => (
+                  <div
+                    key={filter.id}
+                    className="flex items-center gap-2 p-2 rounded-lg border bg-card hover:bg-accent/50 cursor-pointer"
+                    onClick={() => applyFilter(filter)}
+                  >
+                    <span className="text-sm flex-1 truncate">{filter.name}</span>
+                    <span className="text-xs text-muted-foreground">({filter.useCount})</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Store Stats */}
+          <div>
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
+              Quick Stats
+            </div>
+            <div className="space-y-2">
+              <div className="p-2 rounded-lg border bg-card">
+                <div className="text-xs text-muted-foreground">Total Stores</div>
+                <div className="text-lg font-semibold">{stores.length}</div>
+              </div>
+              <div className="p-2 rounded-lg border bg-card">
+                <div className="text-xs text-muted-foreground">Sync Health</div>
+                <div className="text-lg font-semibold">{total > 0 ? Math.round((syncedCount/total)*100) : 0}%</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Center Table */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-white/50">
+            <Button size="sm" variant="outline" onClick={toggleSelectAll}>Select All</Button>
+            <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={() => setShowPriceDialog(true)}>
+              Bulk Edit
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleSyncClick} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              Sync {stores.length > 1 ? '▾' : ''}
+            </Button>
+            <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={() => setShowTagDialog(true)}>
+              Tags
+            </Button>
+            <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-1" />Export
+            </Button>
+            <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={() => setShowDeleteDialog(true)}>
+              Delete
+            </Button>
+            <div className="flex-1" />
+            <span className="text-xs text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-600" onClick={() => router.push('/stores')}>
+              + Connect Store
+            </Button>
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
+            {(['all', 'synced', 'drafts', 'errors', 'pending'] as const).map(f => (
+              <button
+                key={f}
+                className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                  quickFilter === f 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : 'bg-background hover:bg-accent'
+                }`}
+                onClick={() => setQuickFilter(f)}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 overflow-auto">
+            <table className="w-full">
+              <thead className="sticky top-0 bg-muted/50 z-10">
+                <tr className="border-b">
+                  <th className="p-3 text-left w-10">
+                    <input type="checkbox" checked={selectedProducts.size === products.length && products.length > 0} onChange={toggleSelectAll} />
+                  </th>
+                  <th className="p-3 text-left w-16 text-xs font-semibold">Image</th>
+                  <th className="p-3 text-left text-xs font-semibold">Title</th>
+                  <th className="p-3 text-left text-xs font-semibold">SKU</th>
+                  <th className="p-3 text-left text-xs font-semibold">Price</th>
+                  <th className="p-3 text-left text-xs font-semibold">Status</th>
+                  <th className="p-3 text-left text-xs font-semibold">Platform</th>
+                  <th className="p-3 text-left text-xs font-semibold">Updated</th>
+                  <th className="p-3 text-left text-xs font-semibold w-32">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr
+                    key={product.id}
+                    className={`border-b hover:bg-accent/30 cursor-pointer ${
+                      selectedProducts.has(product.id) ? 'bg-accent/20' : ''
+                    } ${selectedProduct?.id === product.id ? 'bg-blue-50' : ''}`}
+                    onClick={() => setSelectedProduct(product)}
+                  >
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product.id)}
+                        onChange={() => toggleSelect(product.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className="p-3">
+                      <img 
+                        src={getProductImage(product)} 
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded border bg-gray-100" 
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          if (target.src !== window.location.origin + "/placeholder.jpg") {
+                            target.src = "/placeholder.jpg"
+                          }
+                        }}
+                      />
+                    </td>
+                    <td className="p-3">
+                      <div className="font-medium text-sm max-w-md truncate">{product.name}</div>
+                      {product.tags.length > 0 && (
+                        <div className="text-xs text-muted-foreground truncate">{product.tags[0]}</div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <span className="font-mono text-xs text-muted-foreground">{product.sku || '-'}</span>
+                    </td>
+                    <td className="p-3 font-medium text-sm">${product.price.toFixed(2)}</td>
+                    <td className="p-3">
+                      {product.syncStatus === 'synced' && (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />Synced
+                        </Badge>
+                      )}
+                      {product.syncStatus === 'error' && (
+                        <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                          <AlertCircle className="h-3 w-3 mr-1" />Error
+                        </Badge>
+                      )}
+                      {!product.syncStatus && (
+                        <Badge variant="outline" className="text-xs bg-yellow-50">Pending</Badge>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div className={`w-6 h-6 rounded ${getPlatformColor(product.platform)}`} title={product.platform} />
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground">
+                      {new Date(product.updatedAt).toLocaleDateString()}
+                    </td>
+                    <td className="p-3">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (product.storeConnection) {
+                            router.push(`/stores/${product.storeConnection.id}/products/${product.id}/edit`)
+                          }
+                        }}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />Edit
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-t bg-white/50">
+              <Button size="sm" variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm">
+                Page {page} of {totalPages} ({total.toLocaleString()} products)
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </main>
+
+        {/* Right Drawer */}
+        <aside className="w-96 border-l bg-white p-4 overflow-y-auto shrink-0">
+          {selectedProduct ? (
+            <div className="space-y-4">
+              {/* Quick Edit */}
+              <Card>
+                <CardContent className="p-4">
+                  <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                    <Edit className="h-4 w-4" />Quick Edit
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Title</label>
+                      <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Price</label>
+                      <Input value={editedPrice} onChange={(e) => setEditedPrice(e.target.value)} className="mt-1" type="number" step="0.01" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Tags (comma-separated)</label>
+                      <Input value={editedTags} onChange={(e) => setEditedTags(e.target.value)} className="mt-1" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" className="flex-1" onClick={handleQuickSave} disabled={saving}>
+                      <Save className="h-3 w-3 mr-1" />{saving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="flex-1"
+                      onClick={() => {
+                        setEditedName(selectedProduct.name)
+                        setEditedPrice(selectedProduct.price.toString())
+                        setEditedTags(selectedProduct.tags.join(', '))
+                      }}
+                    >
+                      Discard
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Product Info */}
+              <Card>
+                <CardContent className="p-4">
+                  <h4 className="font-semibold mb-3 text-sm">Product Info</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">SKU</span>
+                      <span className="font-mono">{selectedProduct.sku || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Platform</span>
+                      <Badge className={getPlatformColor(selectedProduct.platform) + ' text-white'}>
+                        {selectedProduct.platform}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Store</span>
+                      <span className="truncate">{selectedProduct.storeConnection?.storeName || 'Legacy'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Last Synced</span>
+                      <span className="text-xs">
+                        {selectedProduct.lastSyncedAt 
+                          ? new Date(selectedProduct.lastSyncedAt).toLocaleString()
+                          : 'Never'}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Product Actions */}
+              <div className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (selectedProduct.storeConnection) {
+                      router.push(`/stores/${selectedProduct.storeConnection.id}/products/${selectedProduct.id}/edit`)
+                    }
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Full Edit
+                </Button>
+                <Button variant="outline" className="w-full justify-start" disabled>
+                  View Analytics
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center">
+                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Select a product to view details</p>
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
+
+      {/* Floating Bulk Bar */}
+      {selectedProducts.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm border rounded-full shadow-2xl px-4 py-2 flex items-center gap-3 z-50">
+          <Badge variant="secondary">{selectedProducts.size} selected</Badge>
+          <Button size="sm" variant="outline" onClick={() => setShowPriceDialog(true)}>Bulk Edit</Button>
+          <Button size="sm" variant="outline" onClick={() => setShowTagDialog(true)}>Tags</Button>
+          <Button size="sm" variant="outline" onClick={handleExportCSV}>Export</Button>
+          <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}>Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedProducts(new Set())}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* Dialogs */}
+      <BulkPriceDialog open={showPriceDialog} onOpenChange={setShowPriceDialog} selectedCount={selectedProducts.size} onConfirm={handleBulkPrice} />
+      <BulkTagDialog open={showTagDialog} onOpenChange={setShowTagDialog} selectedCount={selectedProducts.size} onConfirm={handleBulkTags} />
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedProducts.size} Products?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Sync Store Selection Dialog */}
+      <Dialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Store to Sync</DialogTitle>
+            <DialogDescription>
+              Choose which store you want to sync products from
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2 py-4">
+            {stores.map(store => (
+              <Button
+                key={store.id}
+                variant="outline"
+                className="w-full justify-between h-auto py-4"
+                onClick={() => handlePreviewSync(store.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${getPlatformColor(store.platform)}`} />
+                  <div className="text-left">
+                    <div className="font-medium">{store.storeName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {store.platform} • {store.productCount} products
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {store.lastSyncedAt
+                    ? `Synced ${new Date(store.lastSyncedAt).toLocaleDateString()}`
+                    : 'Never synced'}
+                </div>
+              </Button>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSyncDialog(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sync Preview Dialog */}
+      <Dialog open={showSyncPreview} onOpenChange={setShowSyncPreview}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync Preview - {syncPreviewData?.storeName}</DialogTitle>
+            <DialogDescription>
+              Review what will be synced and pricing implications
+            </DialogDescription>
+          </DialogHeader>
+          
+          {syncPreviewData && (
+            <div className="space-y-4 py-4">
+              {/* Product Summary */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="text-sm font-semibold mb-2">📦 Store: {syncPreviewData.storeName}</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Products in {syncPreviewData.platform}:</span>
+                    <span className="font-semibold">{syncPreviewData.platformProductCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Currently synced:</span>
+                    <span className="font-semibold">{syncPreviewData.currentStoreProducts || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform Access Check */}
+              {syncPreviewData.needsUserUpgrade && (
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <div className="font-semibold text-red-900 mb-2">🚫 Platform Not Available</div>
+                  <div className="text-sm text-red-800">
+                    Your <strong>{syncPreviewData.userTier}</strong> plan doesn't include {syncPreviewData.platform} access.
+                    Upgrade to PAID to access all platforms.
+                  </div>
+                </div>
+              )}
+
+              {/* Per-Store Pricing */}
+              {!syncPreviewData.needsUserUpgrade && syncPreviewData.requiredTier && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                  <div className="font-semibold mb-2">💰 Store Billing (Per-Store Pricing)</div>
+                  <div className="space-y-2 text-sm">
+                    <p className="text-gray-700">
+                      This store will be billed separately based on its product count:
+                    </p>
+                    <div className="p-3 bg-white rounded border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-semibold">{syncPreviewData.requiredTier.name}</div>
+                        <Badge variant="secondary">{syncPreviewData.newStoreTotal} products</Badge>
+                      </div>
+                      <div className="text-muted-foreground text-xs mb-2">
+                        {syncPreviewData.requiredTier.minProducts} - {
+                          syncPreviewData.requiredTier.maxProducts === -1
+                            ? 'Unlimited'
+                            : syncPreviewData.requiredTier.maxProducts
+                        } products per store
+                      </div>
+                      <div className="text-2xl font-bold text-green-600">
+                        ${syncPreviewData.requiredTier.monthlyPrice}
+                        <span className="text-sm font-normal text-muted-foreground">/month</span>
+                      </div>
+                      {syncPreviewData.requiredTier.yearlyPrice && (
+                        <div className="text-xs text-green-600 mt-1">
+                          ${syncPreviewData.requiredTier.yearlyPrice}/year (save{' '}
+                          {Math.round((1 - (syncPreviewData.requiredTier.yearlyPrice / (syncPreviewData.requiredTier.monthlyPrice * 12))) * 100)}%)
+                        </div>
+                      )}
+                    </div>
+                    {syncPreviewData.currentStoreTier && (
+                      <p className="text-xs text-muted-foreground">
+                        Current tier: {syncPreviewData.currentStoreTier.name} (${syncPreviewData.currentStoreTier.price}/mo)
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {!syncPreviewData.needsUserUpgrade && !syncPreviewData.needsStoreUpgrade && (
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 text-green-900">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <div className="font-semibold">Ready to Sync!</div>
+                      <div className="text-sm text-green-800">
+                        This store's current tier supports {syncPreviewData.newStoreTotal} products.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSyncPreview(false)}>
+              Cancel
+            </Button>
+            {syncPreviewData?.needsUserUpgrade ? (
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                onClick={() => {
+                  setShowSyncPreview(false)
+                  router.push('/billing')
+                }}
+              >
+                Upgrade to Access {syncPreviewData.platform}
+              </Button>
+            ) : syncPreviewData?.needsStoreUpgrade ? (
+              <Button
+                className="bg-gradient-to-r from-green-600 to-emerald-600"
+                onClick={() => {
+                  setShowSyncPreview(false)
+                  router.push('/billing')
+                }}
+              >
+                Subscribe ${syncPreviewData.requiredTier?.monthlyPrice}/mo for This Store
+              </Button>
+            ) : (
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                onClick={handleConfirmSync}
+              >
+                Sync {syncPreviewData?.platformProductCount} Products
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

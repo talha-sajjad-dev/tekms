@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { db } from '@/lib/db'
 import { getStripe } from './client'
+import { sendEmail } from '@/lib/email/send'
 
 /**
  * Handle Stripe webhook events
@@ -103,7 +104,39 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     data: { status: 'ACTIVE' }
   })
   
-  // TODO: Send success email notification
+  // Send success email notification
+  try {
+    const storeSubscription = await db.storeSubscription.findFirst({
+      where: { stripeSubscriptionId: subscription.id },
+      include: {
+        storeConnection: {
+          include: {
+            user: {
+              select: { email: true, name: true }
+            }
+          }
+        },
+        pricingTier: true
+      }
+    })
+    
+    if (storeSubscription?.storeConnection.user) {
+      await sendEmail({
+        to: storeSubscription.storeConnection.user.email,
+        subject: 'Payment Successful - Subscription Active',
+        template: 'payment_success',
+        data: {
+          userName: storeSubscription.storeConnection.user.name || 'Customer',
+          storeName: storeSubscription.storeConnection.storeName,
+          amount: (invoice.amount_paid / 100).toFixed(2),
+          tierName: storeSubscription.pricingTier.name,
+          periodEnd: new Date(subscription.current_period_end * 1000).toLocaleDateString()
+        }
+      }).catch(err => console.error('Failed to send payment success email:', err))
+    }
+  } catch (emailError) {
+    console.error('Error sending payment success email:', emailError)
+  }
   
   return { received: true }
 }
@@ -125,7 +158,40 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     data: { status: 'PAST_DUE' }
   })
   
-  // TODO: Send payment failed email notification
+  // Send payment failed email notification
+  try {
+    const storeSubscription = await db.storeSubscription.findFirst({
+      where: { stripeSubscriptionId: subscription.id },
+      include: {
+        storeConnection: {
+          include: {
+            user: {
+              select: { email: true, name: true }
+            }
+          }
+        }
+      }
+    })
+    
+    if (storeSubscription?.storeConnection.user) {
+      await sendEmail({
+        to: storeSubscription.storeConnection.user.email,
+        subject: 'Payment Failed - Action Required',
+        template: 'payment_failed',
+        data: {
+          userName: storeSubscription.storeConnection.user.name || 'Customer',
+          storeName: storeSubscription.storeConnection.storeName,
+          amount: (invoice.amount_due / 100).toFixed(2),
+          attemptCount: invoice.attempt_count || 1,
+          nextAttempt: invoice.next_payment_attempt
+            ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString()
+            : 'Soon'
+        }
+      }).catch(err => console.error('Failed to send payment failed email:', err))
+    }
+  } catch (emailError) {
+    console.error('Error sending payment failed email:', emailError)
+  }
   
   return { received: true }
 }

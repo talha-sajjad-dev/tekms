@@ -88,19 +88,27 @@ export async function DELETE(
       )
     }
     
-    // If there's a store subscription, it should be cancelled
-    // (We'll implement Stripe cancellation in Phase 5)
+    // If there's a store subscription, cancel it in Stripe first
     if (store.storeSubscription) {
-      // TODO: Cancel Stripe subscription
+      if (store.storeSubscription.stripeSubscriptionId) {
+        try {
+          const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+          await stripe.subscriptions.cancel(store.storeSubscription.stripeSubscriptionId)
+          console.log(`✅ Cancelled Stripe subscription: ${store.storeSubscription.stripeSubscriptionId}`)
+        } catch (stripeError) {
+          console.error('Failed to cancel Stripe subscription:', stripeError)
+          // Continue with local deletion even if Stripe fails
+        }
+      }
+      
       await db.storeSubscription.delete({
         where: { id: store.storeSubscription.id }
       })
     }
     
-    // Mark products as orphaned (keep data but disconnect from store)
-    await db.product.updateMany({
-      where: { storeConnectionId: params.id },
-      data: { storeConnectionId: null }
+    // Delete all products from this store
+    await db.product.deleteMany({
+      where: { storeConnectionId: params.id }
     })
     
     // Delete store connection

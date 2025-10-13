@@ -376,60 +376,25 @@ export default function StoresPageContent() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {platform.stores.map((store) => (
-                      <Card key={store.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-4 flex-1">
-                              <div className={`w-12 h-12 rounded-lg ${platform.color} flex items-center justify-center text-2xl`}>
-                                {platform.icon}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-semibold text-lg">{store.storeName}</h3>
-                                  {getStatusBadge(store.syncStatus, store.isActive)}
-                                </div>
-                                {store.storeUrl && (
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    {store.storeUrl}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <Package className="h-4 w-4" />
-                                    <span>{store.productCount} products</span>
-                                  </div>
-                                  <div>
-                                    Last synced: {formatDate(store.lastSyncedAt)}
-                                  </div>
-                                </div>
-                              </div>
+                      <Card key={store.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setDisconnectId(store.id)}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`w-8 h-8 rounded ${platform.color} flex items-center justify-center text-lg`}>
+                              {platform.icon}
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSync(store.id)}
-                              >
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                                Sync
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push(`/stores/${store.id}`)}
-                              >
-                                Manage
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDisconnectId(store.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-sm truncate">{store.storeName}</h3>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Products</span>
+                              <span className="font-medium">{store.productCount}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {getStatusBadge(store.syncStatus, store.isActive)}
                             </div>
                           </div>
                         </CardContent>

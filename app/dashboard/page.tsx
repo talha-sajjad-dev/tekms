@@ -47,10 +47,12 @@ export default function DashboardPage() {
   const [loadingUsage, setLoadingUsage] = useState(true)
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "unauthenticated") {
+      router.push("/")
+    } else if (status === "authenticated") {
       fetchUsage()
     }
-  }, [status])
+  }, [status, router])
 
   const fetchUsage = async () => {
     try {
@@ -74,9 +76,16 @@ export default function DashboardPage() {
     )
   }
 
-  if (!session) {
-    router.push("/")
+  if (status === "unauthenticated") {
     return null
+  }
+
+  if (!session) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   // Main quick actions for all users
@@ -86,26 +95,22 @@ export default function DashboardPage() {
       title: "Store Connections",
       description: "Connect and manage your marketplace stores",
       href: "/stores",
-      highlight: true
+      highlight: true,
+      badge: undefined
     },
     {
       icon: CreditCard,
       title: "Billing & Subscriptions",
       description: "Manage your subscriptions and payment",
-      href: "/billing"
+      href: "/billing",
+      badge: undefined
     },
     {
       icon: ShoppingBag,
       title: "Products",
-      description: "View and manage all your products",
-      href: "/products"
-    },
-    {
-      icon: TrendingUp,
-      title: "Analytics",
-      description: "View performance and insights",
-      href: "/analytics",
-      badge: "Coming Soon"
+      description: "Manage products, sync, and view analytics",
+      href: "/products",
+      badge: undefined
     }
   ]
 
@@ -138,7 +143,7 @@ export default function DashboardPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Stats Overview */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
           <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
             <CardHeader className="pb-2">
               <CardDescription>Connected Stores</CardDescription>
@@ -157,27 +162,9 @@ export default function DashboardPage() {
           
           <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardDescription>Total Products</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">
-                {loadingUsage ? "..." : usage?.productUsage.current || 0}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!loadingUsage && usage && (
-                <p className="text-xs text-gray-600">
-                  {usage.productUsage.limit === -1
-                    ? "Unlimited"
-                    : `${usage.productUsage.remaining} remaining`}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
               <CardDescription>Subscription</CardDescription>
               <CardTitle className="text-2xl">
-                <Badge 
+                <Badge
                   variant={usage?.tier === "FREE" ? "secondary" : "default"}
                   className="bg-gradient-to-r from-blue-600 to-cyan-600"
                 >
@@ -186,27 +173,13 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Button 
-                variant="link" 
-                className="p-0 h-auto text-xs text-blue-600" 
+              <Button
+                variant="link"
+                className="p-0 h-auto text-xs text-blue-600"
                 onClick={() => router.push("/billing")}
               >
                 Manage Billing →
               </Button>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-blue-100 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardDescription>Monthly Cost</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">
-                $0.00
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-gray-600">
-                {usage?.tier === "FREE" ? "Free plan" : "View billing details"}
-              </p>
             </CardContent>
           </Card>
         </div>
