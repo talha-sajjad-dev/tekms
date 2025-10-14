@@ -113,17 +113,45 @@ export default function DashboardPage() {
       badge: undefined
     },
     {
-      icon: CreditCard,
-      title: "Billing & Subscriptions",
-      description: "Manage your subscriptions and payment",
-      href: "/billing",
-      badge: undefined
-    },
-    {
       icon: ShoppingBag,
       title: "Products",
-      description: "Manage products, sync, and view analytics",
+      description: "Create, manage, and publish products",
       href: "/products",
+      badge: "New"
+    },
+    {
+      icon: Package,
+      title: "Create Product",
+      description: "Create once, publish everywhere",
+      href: "/products/master/create",
+      badge: "POD"
+    },
+    {
+      icon: TrendingUp,
+      title: "Pricing Rules",
+      description: "Automate pricing per platform",
+      href: "/pricing-rules",
+      badge: "Auto"
+    },
+    {
+      icon: Package,
+      title: "Templates",
+      description: "Bulk create POD products",
+      href: "/templates",
+      badge: "Bulk"
+    },
+    {
+      icon: LinkIcon,
+      title: "Categories",
+      description: "Smart category mapping",
+      href: "/category-mappings",
+      badge: "AI"
+    },
+    {
+      icon: CreditCard,
+      title: "Billing",
+      description: "Manage subscriptions and payment",
+      href: "/billing",
       badge: undefined
     }
   ]
