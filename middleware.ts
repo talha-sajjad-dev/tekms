@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
+import { isMaintenanceMode } from "@/lib/maintenance"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  
+  // Check maintenance mode FIRST (file-based check, works on Edge)
+  const maintenanceMode = isMaintenanceMode()
+  const maintenanceBypass = request.cookies.get('maintenance_bypass')?.value === 'true'
+  
+  // Redirect to maintenance if enabled (except for maintenance page itself and APIs)
+  if (maintenanceMode && pathname !== '/maintenance' && !pathname.startsWith('/api/')) {
+    const session = await auth()
+    const isAdmin = session?.user?.role === 'ADMIN'
+    
+    if (!isAdmin && !maintenanceBypass) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/maintenance'
+      return NextResponse.redirect(url)
+    }
+  }
   
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -25,7 +42,6 @@ export async function middleware(request: NextRequest) {
   // Check if route is public or API route (handled by route itself)
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isNextInternal = pathname.startsWith("/_next") || pathname.startsWith("/api/auth/")
-  const isMaintenancePage = pathname === "/maintenance"
 
   // Allow public routes and Next.js internal routes WITHOUT checking session
   // This is critical because auth() uses Prisma which doesn't work in edge middleware
@@ -35,9 +51,6 @@ export async function middleware(request: NextRequest) {
 
   // Only call auth() for protected routes
   const session = await auth()
-  
-  // Note: Maintenance mode is now handled in the layout component
-  // which can access the database directly
 
   // Require authentication for all other routes
   if (!session?.user) {
