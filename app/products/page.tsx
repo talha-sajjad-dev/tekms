@@ -691,6 +691,9 @@ export default function ProductsPage() {
             <span className="text-xs text-muted-foreground">
               Page {page} of {totalPages}
             </span>
+            <Button size="sm" variant="outline" onClick={() => router.push('/products/master/create')}>
+              ✨ Create Product
+            </Button>
             <Button size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-600" onClick={() => router.push('/stores')}>
               + Connect Store
             </Button>
