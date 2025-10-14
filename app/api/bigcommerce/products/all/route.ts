@@ -22,7 +22,7 @@ export async function GET() {
 
     // First, try to get a small batch of products to test the connection
     const testResponse = await fetch(
-      `${API_URL}/catalog/products?limit=10&include_fields=id,name,sku,price,inventory_level,is_visible`,
+      `${API_URL}/catalog/products?limit=10&include_fields=id,name,sku,price,inventory_level,is_visible,images`,
       {
         headers,
         cache: "no-store",
@@ -39,7 +39,7 @@ export async function GET() {
     console.log(`Connection test successful. Found ${testData.data?.length || 0} products in test batch.`)
 
     // If test is successful, proceed with fetching all products
-    let allProducts = []
+    let allProducts: any[] = []
     let page = 1
     let hasMorePages = true
     const limit = 100 // Reduced from 250 to be safer
@@ -50,7 +50,7 @@ export async function GET() {
       console.log(`Fetching page ${page}...`)
 
       const response = await fetch(
-        `${API_URL}/catalog/products?limit=${limit}&page=${page}&include_fields=id,name,sku,price,inventory_level,is_visible`,
+        `${API_URL}/catalog/products?limit=${limit}&page=${page}&include_fields=id,name,sku,price,inventory_level,is_visible,images`,
         {
           headers,
           cache: "no-store",

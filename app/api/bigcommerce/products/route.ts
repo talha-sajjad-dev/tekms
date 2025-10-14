@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     console.log("Limit:", limit)
     console.log("API URL:", API_URL)
 
-    const response = await fetch(`${API_URL}/catalog/products?limit=${limit}`, {
+    const response = await fetch(`${API_URL}/catalog/products?limit=${limit}&include=images`, {
       headers,
       cache: "no-store",
     })

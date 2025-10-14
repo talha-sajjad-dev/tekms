@@ -588,9 +588,6 @@ export default function ProductsPage() {
         <div className="flex items-center gap-2">
           <Badge variant="secondary">Synced {syncedCount}</Badge>
           <Badge variant="destructive">Errors {errorCount}</Badge>
-          <Button variant="outline" size="sm" onClick={fetchProducts} disabled={searching}>
-            <RefreshCw className={`h-4 w-4 ${searching ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
       </header>
 
@@ -722,10 +719,6 @@ export default function ProductsPage() {
               className="border-primary/50 hover:bg-primary/5"
             >
               {selectedProducts.size === 1 ? 'Edit' : 'Bulk Edit'}
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleSyncClick} disabled={syncing}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-              Sync {stores.length > 1 ? '▾' : ''}
             </Button>
             <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={() => setShowTagDialog(true)}>
               Tags

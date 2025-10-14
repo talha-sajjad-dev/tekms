@@ -478,7 +478,7 @@ async function syncBigCommerceProducts(store: any, accessToken: string, jobId: s
       logRateLimitStatus()
       
       const response = await rateLimitedFetch(
-        `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=250&page=${page}`,
+        `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=250&page=${page}&include=images`,
         {
           headers: {
             'X-Auth-Token': accessToken,
