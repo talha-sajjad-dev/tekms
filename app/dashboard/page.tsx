@@ -102,7 +102,7 @@ export default function DashboardPage() {
     )
   }
 
-  // Main quick actions for all users
+  // Main quick actions for all users - POD features now accessible within Products page
   const quickActions = [
     {
       icon: Store,
@@ -115,37 +115,10 @@ export default function DashboardPage() {
     {
       icon: ShoppingBag,
       title: "Products",
-      description: "Create, manage, and publish products",
+      description: "All POD features accessible in one place",
       href: "/products",
-      badge: "New"
-    },
-    {
-      icon: Package,
-      title: "Create Product",
-      description: "Create once, publish everywhere",
-      href: "/products/master/create",
-      badge: "POD"
-    },
-    {
-      icon: TrendingUp,
-      title: "Pricing Rules",
-      description: "Automate pricing per platform",
-      href: "/pricing-rules",
-      badge: "Auto"
-    },
-    {
-      icon: Package,
-      title: "Templates",
-      description: "Bulk create POD products",
-      href: "/templates",
-      badge: "Bulk"
-    },
-    {
-      icon: LinkIcon,
-      title: "Categories",
-      description: "Smart category mapping",
-      href: "/category-mappings",
-      badge: "AI"
+      badge: "All-in-One",
+      highlight: true
     },
     {
       icon: CreditCard,
@@ -229,7 +202,7 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4 text-gray-900">Quick Actions</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             {quickActions.map((action, index) => (
               <Card
                 key={index}
