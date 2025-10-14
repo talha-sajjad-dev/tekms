@@ -650,7 +650,7 @@ export default function AdminSettingsPage() {
                             </div>
                             <p className="text-xs text-blue-800">
                               <strong>How it works:</strong> System automatically uses NEXTAUTH_URL from your .env file.
-                              Local dev uses localhost:3000, production uses tekms.app - no manual switching needed!
+                              Local dev uses localhost:3000, production uses tekms.com - no manual switching needed!
                             </p>
                           </div>
                         </div>
