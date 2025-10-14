@@ -8,7 +8,6 @@ import {
   getSettingsByCategory,
   getSettingsObject
 } from '@/lib/settings/service'
-import { enableMaintenanceMode, disableMaintenanceMode } from '@/lib/maintenance'
 
 /**
  * GET /api/admin/settings
@@ -102,16 +101,10 @@ export async function POST(req: NextRequest) {
     
     const result = await updateSettings(settingsWithUser)
     
-    // Check if maintenance mode setting was updated
+    // Log maintenance mode changes
     const maintenanceSetting = settings.find(s => s.key === 'general.maintenance_mode')
     if (maintenanceSetting) {
-      if (maintenanceSetting.value === 'true') {
-        enableMaintenanceMode()
-        console.log('✅ Maintenance mode file created')
-      } else {
-        disableMaintenanceMode()
-        console.log('✅ Maintenance mode file removed')
-      }
+      console.log(`✅ Maintenance mode ${maintenanceSetting.value === 'true' ? 'enabled' : 'disabled'}`)
     }
     
     if (result.failed > 0) {

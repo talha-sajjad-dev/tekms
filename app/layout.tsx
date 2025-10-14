@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Footer } from "@/components/footer"
 import { LoadingBar } from "@/components/loading-bar"
+import { MaintenanceRedirect } from "@/components/MaintenanceRedirect"
 import { Providers } from "./providers"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -58,6 +59,7 @@ export default function RootLayout({
       <body className={`${inter.className} flex flex-col min-h-screen`} suppressHydrationWarning>
         <Providers>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <MaintenanceRedirect />
             <DynamicMetadata />
             <Suspense fallback={null}>
               <LoadingBar />
