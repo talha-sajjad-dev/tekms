@@ -15,6 +15,8 @@ import { CreateProductModal } from '@/components/products/CreateProductModal'
 import { PricingRulesModal } from '@/components/products/PricingRulesModal'
 import { TemplatesModal } from '@/components/products/TemplatesModal'
 import { CategoryMappingsModal } from '@/components/products/CategoryMappingsModal'
+import { ActionMenu } from '@/components/products/ActionMenu'
+import { ApplyPricingDialog } from '@/components/products/ApplyPricingDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -121,6 +123,12 @@ export default function ProductsPage() {
   const [showPricingRulesModal, setShowPricingRulesModal] = useState(false)
   const [showTemplatesModal, setShowTemplatesModal] = useState(false)
   const [showCategoryMappingsModal, setShowCategoryMappingsModal] = useState(false)
+  
+  // Action Menu states
+  const [showActionMenu, setShowActionMenu] = useState(false)
+  const [showStoreActionMenu, setShowStoreActionMenu] = useState(false)
+  const [selectedStoreForAction, setSelectedStoreForAction] = useState<string>('')
+  const [showApplyPricingDialog, setShowApplyPricingDialog] = useState(false)
   
   // Quick edit state
   const [editedName, setEditedName] = useState('')
@@ -605,12 +613,12 @@ export default function ProductsPage() {
                 stores.map(store => (
                   <div
                     key={store.id}
-                    className={`group flex items-center gap-2 p-2 rounded-lg border cursor-pointer hover:bg-accent/50 ${
+                    className={`group flex items-center gap-2 p-2 rounded-lg border hover:bg-accent/50 transition-all ${
                       selectedStoreIds.includes(store.id) ? 'bg-accent border-primary' : 'bg-card'
                     }`}
                   >
-                    <div 
-                      className="flex-1 flex items-center gap-2"
+                    <div
+                      className="flex-1 flex items-center gap-2 cursor-pointer"
                       onClick={() => {
                         setSelectedStoreIds(prev =>
                           prev.includes(store.id) ? prev.filter(id => id !== store.id) : [...prev, store.id]
@@ -621,18 +629,36 @@ export default function ProductsPage() {
                       <span className="text-sm flex-1 truncate">{store.storeName}</span>
                       <span className="text-xs text-muted-foreground">{store.productCount}</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handlePreviewSync(store.id)
-                      }}
-                      disabled={syncing}
-                    >
-                      <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
-                    </Button>
+                    
+                    {/* Hover Action Buttons */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedStoreForAction(store.id)
+                          setShowStoreActionMenu(true)
+                        }}
+                        title="Edit store products"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePreviewSync(store.id)
+                        }}
+                        disabled={syncing}
+                        title="Sync store"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
@@ -685,8 +711,14 @@ export default function ProductsPage() {
           {/* Toolbar */}
           <div className="flex items-center gap-2 px-4 py-3 border-b bg-white/50">
             <Button size="sm" variant="outline" onClick={toggleSelectAll}>Select All</Button>
-            <Button size="sm" variant="outline" disabled={selectedProducts.size === 0} onClick={() => setShowPriceDialog(true)}>
-              Bulk Edit
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={selectedProducts.size === 0}
+              onClick={() => setShowActionMenu(true)}
+              className="border-primary/50 hover:bg-primary/5"
+            >
+              {selectedProducts.size === 1 ? 'Edit' : 'Bulk Edit'}
             </Button>
             <Button size="sm" variant="outline" onClick={handleSyncClick} disabled={syncing}>
               <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
@@ -1081,6 +1113,76 @@ export default function ProductsPage() {
       <CategoryMappingsModal
         open={showCategoryMappingsModal}
         onOpenChange={setShowCategoryMappingsModal}
+      />
+      
+      {/* Action Menu System */}
+      <ActionMenu
+        open={showActionMenu}
+        onOpenChange={setShowActionMenu}
+        onSelect={(actionId) => {
+          if (actionId === 'apply_pricing') {
+            setShowApplyPricingDialog(true)
+          } else if (actionId === 'apply_category') {
+            toast({
+              title: 'Coming Soon',
+              description: 'Category mapping application will be available soon',
+            })
+          } else if (actionId === 'apply_template') {
+            toast({
+              title: 'Coming Soon',
+              description: 'Template application will be available soon',
+            })
+          } else if (actionId === 'edit_tags') {
+            setShowTagDialog(true)
+          }
+        }}
+        title={selectedProducts.size === 1 ? 'Edit Product' : 'Bulk Edit Products'}
+        description={selectedProducts.size === 1 ? 'Choose an action to apply' : `Choose an action to apply to ${selectedProducts.size} products`}
+        selectedCount={selectedProducts.size}
+      />
+      
+      <ApplyPricingDialog
+        open={showApplyPricingDialog}
+        onOpenChange={setShowApplyPricingDialog}
+        productIds={Array.from(selectedProducts)}
+        onSuccess={() => {
+          fetchProducts()
+          setSelectedProducts(new Set())
+        }}
+      />
+      
+      {/* Store-Level Action Menu */}
+      <ActionMenu
+        open={showStoreActionMenu}
+        onOpenChange={setShowStoreActionMenu}
+        onSelect={(actionId) => {
+          const store = stores.find(s => s.id === selectedStoreForAction)
+          const storeProducts = products.filter(p => p.storeConnection?.id === selectedStoreForAction)
+          const storeProductIds = storeProducts.map(p => p.id)
+          
+          if (actionId === 'apply_pricing' && storeProductIds.length > 0) {
+            setSelectedProducts(new Set(storeProductIds))
+            setShowApplyPricingDialog(true)
+          } else if (actionId === 'apply_category' && storeProductIds.length > 0) {
+            toast({
+              title: 'Coming Soon',
+              description: 'Category mapping for store products will be available soon',
+            })
+          } else if (storeProductIds.length === 0) {
+            toast({
+              title: 'No Products',
+              description: `No products found for ${store?.storeName}. Sync the store first.`,
+              variant: 'destructive'
+            })
+          } else {
+            toast({
+              title: 'Coming Soon',
+              description: 'This feature will be available soon',
+            })
+          }
+        }}
+        title={`Edit Store Products`}
+        description={`Apply bulk actions to all products in ${stores.find(s => s.id === selectedStoreForAction)?.storeName || 'this store'}`}
       />
 
     </div>
