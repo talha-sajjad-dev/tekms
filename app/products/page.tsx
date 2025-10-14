@@ -969,8 +969,18 @@ export default function ProductsPage() {
 
               {/* Product Actions */}
               <div className="space-y-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  className="w-full justify-start bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                  onClick={() => {
+                    setSelectedProducts(new Set([selectedProduct.id]))
+                    setShowActionMenu(true)
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Product
+                </Button>
+                <Button
+                  variant="outline"
                   className="w-full justify-start"
                   onClick={() => {
                     if (selectedProduct.storeConnection) {
@@ -979,7 +989,7 @@ export default function ProductsPage() {
                   }}
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  Full Edit
+                  Advanced Edit
                 </Button>
                 <Button
                   variant="outline"
