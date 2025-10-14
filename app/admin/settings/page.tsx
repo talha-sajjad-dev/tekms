@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { SuccessToast } from '@/components/ui/success-toast'
 import {
@@ -129,9 +130,27 @@ export default function AdminSettingsPage() {
   }
 
   const updateSetting = (key: string, value: string) => {
-    setSettings(prev => prev.map(s => 
-      s.key === key ? { ...s, value } : s
-    ))
+    setSettings(prev => {
+      const existing = prev.find(s => s.key === key)
+      
+      if (existing) {
+        // Update existing setting
+        return prev.map(s => s.key === key ? { ...s, value } : s)
+      } else {
+        // Add new setting
+        return [
+          ...prev,
+          {
+            key,
+            value,
+            category: 'oauth', // Default to oauth for new TikTok settings
+            description: '',
+            type: 'string',
+            isPublic: false
+          }
+        ]
+      }
+    })
   }
 
   const getSetting = (key: string) => {
@@ -698,28 +717,39 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Environment Toggle */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label>Active Environment</Label>
-                  <div className="flex gap-3">
-                    <Button
-                      variant={getSetting('tiktok_environment') === 'sandbox' ? 'default' : 'outline'}
-                      className={`flex-1 ${getSetting('tiktok_environment') === 'sandbox' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
-                      onClick={() => updateSetting('tiktok_environment', 'sandbox')}
-                    >
-                      <FlaskConical className="h-4 w-4 mr-2" />
-                      Sandbox (Testing)
-                    </Button>
-                    <Button
-                      variant={getSetting('tiktok_environment') === 'production' ? 'default' : 'outline'}
-                      className={`flex-1 ${getSetting('tiktok_environment') === 'production' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                      onClick={() => updateSetting('tiktok_environment', 'production')}
-                    >
-                      <Store className="h-4 w-4 mr-2" />
-                      Production (Live)
-                    </Button>
+                  <div className="flex items-center justify-between p-4 rounded-lg border-2 bg-gradient-to-r from-yellow-50 to-green-50">
+                    <div className="flex items-center gap-3">
+                      <FlaskConical className={`h-5 w-5 ${getSetting('tiktok_environment') !== 'production' ? 'text-yellow-600' : 'text-gray-400'}`} />
+                      <div>
+                        <p className="font-semibold text-sm">Sandbox</p>
+                        <p className="text-xs text-muted-foreground">Testing</p>
+                      </div>
+                    </div>
+                    
+                    <Switch
+                      checked={getSetting('tiktok_environment') === 'production'}
+                      onCheckedChange={(checked) => {
+                        updateSetting('tiktok_environment', checked ? 'production' : 'sandbox')
+                        toast({
+                          title: `Switched to ${checked ? 'Production' : 'Sandbox'}`,
+                          description: `TikTok OAuth will now use ${checked ? 'production' : 'sandbox'} credentials`
+                        })
+                      }}
+                      className="data-[state=checked]:bg-green-600"
+                    />
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-sm">Production</p>
+                        <p className="text-xs text-muted-foreground">Live</p>
+                      </div>
+                      <Store className={`h-5 w-5 ${getSetting('tiktok_environment') === 'production' ? 'text-green-600' : 'text-gray-400'}`} />
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Switch instantly without restarting. System uses the active environment's credentials.
+                    Switch instantly. System uses the active environment's credentials immediately.
                   </p>
                 </div>
 
