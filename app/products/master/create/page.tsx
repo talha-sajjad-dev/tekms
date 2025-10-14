@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,7 +64,7 @@ interface ProductTemplate {
   defaultTags: string[]
 }
 
-export default function CreateMasterProductPage() {
+function CreateMasterProductContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
@@ -934,5 +934,17 @@ export default function CreateMasterProductPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function CreateMasterProductPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <CreateMasterProductContent />
+    </Suspense>
   )
 }
