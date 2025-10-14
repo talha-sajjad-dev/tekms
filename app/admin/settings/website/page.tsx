@@ -848,10 +848,86 @@ export default function WebsiteSettingsPage() {
               <CardHeader>
                 <CardTitle>General Settings</CardTitle>
                 <CardDescription>
-                  Integrations and advanced configuration
+                  Integrations, maintenance mode, and advanced configuration
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Maintenance Mode */}
+                <div className="border rounded-lg p-4 space-y-4 bg-gradient-to-r from-amber-50 to-orange-50">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="maintenance-mode" className="text-base font-semibold">
+                        🚧 Maintenance Mode
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enable to show a maintenance page to all visitors except admins
+                      </p>
+                    </div>
+                    <Switch
+                      id="maintenance-mode"
+                      checked={settings['general.maintenance_mode'] === 'true'}
+                      onCheckedChange={(checked) => updateSetting('general.maintenance_mode', checked ? 'true' : 'false')}
+                    />
+                  </div>
+                  
+                  {settings['general.maintenance_mode'] === 'true' && (
+                    <div className="space-y-3 pt-3 border-t">
+                      <div className="space-y-2">
+                        <Label htmlFor="maintenance-title">Maintenance Page Title</Label>
+                        <Input
+                          id="maintenance-title"
+                          value={settings['general.maintenance_title'] || ''}
+                          onChange={(e) => updateSetting('general.maintenance_title', e.target.value)}
+                          placeholder="We'll be back soon!"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="maintenance-message">Maintenance Message</Label>
+                        <Textarea
+                          id="maintenance-message"
+                          value={settings['general.maintenance_message'] || ''}
+                          onChange={(e) => updateSetting('general.maintenance_message', e.target.value)}
+                          placeholder="We're making some improvements to serve you better..."
+                          rows={3}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="maintenance-eta">Estimated Time (optional)</Label>
+                        <Input
+                          id="maintenance-eta"
+                          value={settings['general.maintenance_eta'] || ''}
+                          onChange={(e) => updateSetting('general.maintenance_eta', e.target.value)}
+                          placeholder="Back online in 2 hours"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="maintenance-password">🔑 Admin Bypass Password</Label>
+                        <Input
+                          id="maintenance-password"
+                          type="password"
+                          value={settings['general.maintenance_password'] || ''}
+                          onChange={(e) => updateSetting('general.maintenance_password', e.target.value)}
+                          placeholder="Set a secret password for admin access"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Admins can enter this password on the maintenance page to bypass and access the site
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {settings['general.maintenance_mode'] === 'true' && (
+                    <div className="bg-amber-100 border border-amber-300 rounded p-3">
+                      <p className="text-sm text-amber-900">
+                        <strong>⚠️ Active:</strong> Visitors will see the maintenance page. You (admin) can still access the site.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="ga-id">Google Analytics ID</Label>
                   <Input

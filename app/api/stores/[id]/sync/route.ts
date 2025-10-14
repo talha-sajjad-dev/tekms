@@ -47,29 +47,8 @@ export async function POST(
       )
     }
     
-    // Check subscription limits for platform access
-    const platformCheck = await canPerformAction(session.user.id, {
-      type: 'add_product',
-      platform: store.platform as any
-    })
-    
-    if (!platformCheck.allowed) {
-      return NextResponse.json(
-        { error: platformCheck.reason || 'Platform access denied' },
-        { status: 403 }
-      )
-    }
-    
-    // Check if background sync is allowed (premium feature)
-    if (background) {
-      const hasScheduledSync = await checkFeatureAccess(session.user.id, 'scheduled')
-      if (!hasScheduledSync) {
-        return NextResponse.json({
-          error: 'Background sync is a premium feature. Please upgrade your plan.',
-          upgrade: true
-        }, { status: 403 })
-      }
-    }
+    // Note: All platforms available in store-based model
+    // Billing is handled per-store via automatic pricing tier assignment
     
     // Check if there's already a sync job running
     const existingJob = await db.syncJob.findFirst({
@@ -131,38 +110,114 @@ export async function POST(
   }
 }
 
+// Assign pricing tier based on product count
+async function assignStorePricingTier(storeId: string, productCount: number): Promise<void> {
+  try {
+    console.log(`📊 Assigning pricing tier for ${productCount} products...`)
+    
+    // Find the appropriate pricing tier based on product count
+    const tier = await db.storePricingTier.findFirst({
+      where: {
+        AND: [
+          { minProducts: { lte: productCount } },
+          {
+            OR: [
+              { maxProducts: { gte: productCount } },
+              { maxProducts: -1 } // Unlimited tier
+            ]
+          },
+          { isActive: true }
+        ]
+      },
+      orderBy: {
+        minProducts: 'asc'
+      }
+    })
+    
+    if (!tier) {
+      console.error(`❌ No pricing tier found for ${productCount} products`)
+      return
+    }
+    
+    console.log(`✅ Found pricing tier: ${tier.name} ($${tier.monthlyPrice}/mo)`)
+    
+    // Get store info
+    const store = await db.storeConnection.findUnique({
+      where: { id: storeId },
+      include: {
+        storeSubscription: true
+      }
+    })
+    
+    if (!store) {
+      console.error(`❌ Store ${storeId} not found`)
+      return
+    }
+    
+    // Create or update store subscription
+    if (store.storeSubscription) {
+      await db.storeSubscription.update({
+        where: { id: store.storeSubscription.id },
+        data: {
+          pricingTierId: tier.id,
+          productCount: productCount
+        }
+      })
+      console.log(`✅ Updated store subscription to ${tier.name} tier`)
+    } else {
+      await db.storeSubscription.create({
+        data: {
+          storeConnectionId: storeId,
+          userId: store.userId,
+          pricingTierId: tier.id,
+          productCount: productCount,
+          status: 'ACTIVE'
+        }
+      })
+      console.log(`✅ Created store subscription with ${tier.name} tier`)
+    }
+  } catch (error) {
+    console.error('Failed to assign pricing tier:', error)
+  }
+}
+
 // Perform the actual sync operation
 async function performSync(store: any, jobId: string): Promise<number> {
   try {
     const accessToken = decrypt(store.accessToken)
     let productCount = 0
     
+    // Pass jobId to platform-specific sync functions
     switch (store.platform) {
       case 'SHOPIFY':
-        productCount = await syncShopifyProducts(store, accessToken)
+        productCount = await syncShopifyProducts(store, accessToken, jobId)
         break
       case 'ETSY':
-        productCount = await syncEtsyProducts(store, accessToken)
+        productCount = await syncEtsyProducts(store, accessToken, jobId)
         break
       case 'BIGCOMMERCE':
-        productCount = await syncBigCommerceProducts(store, accessToken)
+        productCount = await syncBigCommerceProducts(store, accessToken, jobId)
         break
       case 'TIKTOK':
-        productCount = await syncTikTokProducts(store, accessToken)
+        productCount = await syncTikTokProducts(store, accessToken, jobId)
         break
       default:
         throw new Error('Unsupported platform')
     }
     
-    // Update store sync status
+    // Update store sync status and product count
     await db.storeConnection.update({
       where: { id: store.id },
       data: {
         lastSyncedAt: new Date(),
         syncStatus: 'connected',
-        syncError: null
+        syncError: null,
+        productCount: productCount
       }
     })
+    
+    // Assign/update pricing tier based on product count
+    await assignStorePricingTier(store.id, productCount)
     
     // Update sync job as completed
     await db.syncJob.update({
@@ -213,7 +268,7 @@ async function performSync(store: any, jobId: string): Promise<number> {
 }
 
 // Platform-specific sync functions
-async function syncShopifyProducts(store: any, accessToken: string): Promise<number> {
+async function syncShopifyProducts(store: any, accessToken: string, jobId: string): Promise<number> {
   try {
     const shopDomain = store.storeUrl || store.externalStoreId
     let allProducts: any[] = []
@@ -311,7 +366,7 @@ async function syncShopifyProducts(store: any, accessToken: string): Promise<num
   }
 }
 
-async function syncEtsyProducts(store: any, accessToken: string): Promise<number> {
+async function syncEtsyProducts(store: any, accessToken: string, jobId: string): Promise<number> {
   try {
     const shopId = store.externalStoreId
     let allProducts: any[] = []
@@ -408,7 +463,7 @@ async function syncEtsyProducts(store: any, accessToken: string): Promise<number
   }
 }
 
-async function syncBigCommerceProducts(store: any, accessToken: string): Promise<number> {
+async function syncBigCommerceProducts(store: any, accessToken: string, jobId: string): Promise<number> {
   try {
     const storeHash = store.externalStoreId
     let allProducts: any[] = []
@@ -448,6 +503,14 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
     }
     
     console.log(`📊 Total products fetched: ${allProducts.length}`)
+    
+    // Update job with total items
+    await db.syncJob.update({
+      where: { id: jobId },
+      data: {
+        totalItems: allProducts.length
+      }
+    }).catch(() => {}) // Ignore if job doesn't exist
     
     // Process and save products to database in batches
     let syncedCount = 0
@@ -522,6 +585,19 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
         }
       }
       
+      // Update job progress after each batch
+      await db.syncJob.update({
+        where: { id: jobId },
+        data: {
+          processedItems: syncedCount + failedCount,
+          results: {
+            synced: syncedCount,
+            failed: failedCount,
+            total: allProducts.length
+          }
+        }
+      }).catch(() => {}) // Ignore if job doesn't exist
+      
       console.log(`✓ Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allProducts.length / batchSize)} (${syncedCount} synced, ${failedCount} failed)`)
     }
     
@@ -560,7 +636,7 @@ async function syncBigCommerceProducts(store: any, accessToken: string): Promise
   }
 }
 
-async function syncTikTokProducts(store: any, accessToken: string): Promise<number> {
+async function syncTikTokProducts(store: any, accessToken: string, jobId: string): Promise<number> {
   try {
     const shopId = store.externalStoreId
     let allProducts: any[] = []

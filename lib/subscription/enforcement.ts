@@ -1,17 +1,22 @@
 import { db } from "@/lib/db"
-import { SubscriptionTier } from "@prisma/client"
 
-export interface SubscriptionLimits {
-  tier: SubscriptionTier
-  productLimit: number
-  allowBigCommerce: boolean
-  allowShopify: boolean
-  allowEtsy: boolean
-  allowTikTok: boolean
-  allowBulkOps: boolean
-  allowScheduledSync: boolean
-  allowAdvancedAnalytics: boolean
-  allowAPIAccess: boolean
+/**
+ * STORE-BASED SUBSCRIPTION SYSTEM
+ *
+ * This system uses per-store billing based on product count.
+ * Each store has a StoreSubscription linked to a StorePricingTier.
+ * There are NO user-level subscription limits.
+ * All platforms are available to all users.
+ */
+
+export interface StoreSubscriptionInfo {
+  hasSubscription: boolean
+  tierName?: string
+  minProducts?: number
+  maxProducts?: number
+  productCount: number
+  monthlyPrice?: number
+  status?: string
 }
 
 export interface UsageStatus {
@@ -23,134 +28,140 @@ export interface UsageStatus {
 }
 
 /**
- * Get user's subscription limits based on their tier
+ * Get store subscription info (for billing/display purposes)
  */
-export async function getUserSubscriptionLimits(
-  userId: string
-): Promise<SubscriptionLimits | null> {
-  const user = await db.user.findUnique({
-    where: { id: userId },
+export async function getStoreSubscriptionInfo(
+  storeId: string
+): Promise<StoreSubscriptionInfo> {
+  const store = await db.storeConnection.findUnique({
+    where: { id: storeId },
     include: {
-      subscription: true,
-    },
+      storeSubscription: {
+        include: {
+          pricingTier: true
+        }
+      }
+    }
   })
 
-  if (!user?.subscription) {
-    return null
+  if (!store) {
+    throw new Error('Store not found')
   }
 
-  const plan = await db.pricingPlan.findUnique({
-    where: { tier: user.subscription.tier },
-  })
-
-  if (!plan) {
-    return null
+  if (!store.storeSubscription) {
+    return {
+      hasSubscription: false,
+      productCount: store.productCount
+    }
   }
 
   return {
-    tier: user.subscription.tier,
-    productLimit: plan.productLimit,
-    allowBigCommerce: plan.allowBigCommerce,
-    allowShopify: plan.allowShopify,
-    allowEtsy: plan.allowEtsy,
-    allowTikTok: plan.allowTikTok,
-    allowBulkOps: plan.allowBulkOps,
-    allowScheduledSync: plan.allowScheduledSync,
-    allowAdvancedAnalytics: plan.allowAdvancedAnalytics,
-    allowAPIAccess: plan.allowAPIAccess,
+    hasSubscription: true,
+    tierName: store.storeSubscription.pricingTier.name,
+    minProducts: store.storeSubscription.pricingTier.minProducts,
+    maxProducts: store.storeSubscription.pricingTier.maxProducts,
+    productCount: store.productCount,
+    monthlyPrice: Number(store.storeSubscription.pricingTier.monthlyPrice),
+    status: store.storeSubscription.status
   }
 }
 
 /**
- * Check if user can add more products
+ * @deprecated User-level subscriptions are removed. Use getStoreSubscriptionInfo instead.
  */
-export async function checkProductLimit(
-  userId: string
-): Promise<UsageStatus> {
-  const limits = await getUserSubscriptionLimits(userId)
-
-  if (!limits) {
-    return {
-      allowed: false,
-      current: 0,
-      limit: 0,
-      percentage: 0,
-      remaining: 0,
-    }
+export async function getUserSubscriptionLimits(userId: string): Promise<any> {
+  // All platforms available to all users
+  // Billing is per-store via StoreSubscription
+  return {
+    tier: 'STORE_BASED',
+    productLimit: -1,
+    allowBigCommerce: true,
+    allowShopify: true,
+    allowEtsy: true,
+    allowTikTok: true,
+    allowBulkOps: true,
+    allowScheduledSync: true,
+    allowAdvancedAnalytics: true,
+    allowAPIAccess: true,
   }
+}
 
-  // Count total products for user
-  const productCount = await db.product.count({
-    where: { userId },
-  })
+/**
+ * Check if store can add more products based on its pricing tier
+ */
+export async function checkStoreProductLimit(
+  storeId: string
+): Promise<UsageStatus> {
+  const info = await getStoreSubscriptionInfo(storeId)
 
-  // -1 means unlimited
-  if (limits.productLimit === -1) {
+  if (!info.hasSubscription) {
+    // No subscription yet - allow unlimited until billing is set up
     return {
       allowed: true,
-      current: productCount,
+      current: info.productCount,
       limit: -1,
       percentage: 0,
       remaining: -1,
     }
   }
 
-  const percentage = (productCount / limits.productLimit) * 100
-  const remaining = Math.max(0, limits.productLimit - productCount)
+  // -1 means unlimited in the tier
+  if (info.maxProducts === -1) {
+    return {
+      allowed: true,
+      current: info.productCount,
+      limit: -1,
+      percentage: 0,
+      remaining: -1,
+    }
+  }
+
+  const percentage = (info.productCount / (info.maxProducts || 1)) * 100
+  const remaining = Math.max(0, (info.maxProducts || 0) - info.productCount)
 
   return {
-    allowed: productCount < limits.productLimit,
-    current: productCount,
-    limit: limits.productLimit,
+    allowed: info.productCount < (info.maxProducts || 0),
+    current: info.productCount,
+    limit: info.maxProducts || 0,
     percentage,
     remaining,
   }
 }
 
 /**
- * Check if user has access to a specific platform
+ * @deprecated All platforms available to all users
+ */
+export async function checkProductLimit(userId: string): Promise<UsageStatus> {
+  // No user-level limits - only per-store limits via checkStoreProductLimit
+  const productCount = await db.product.count({ where: { userId } })
+  
+  return {
+    allowed: true,
+    current: productCount,
+    limit: -1,
+    percentage: 0,
+    remaining: -1,
+  }
+}
+
+/**
+ * All platforms available to all users
  */
 export async function checkPlatformAccess(
   userId: string,
   platform: "BIGCOMMERCE" | "SHOPIFY" | "ETSY" | "TIKTOK"
 ): Promise<boolean> {
-  const limits = await getUserSubscriptionLimits(userId)
-
-  if (!limits) {
-    return false
-  }
-
-  const platformMap = {
-    BIGCOMMERCE: limits.allowBigCommerce,
-    SHOPIFY: limits.allowShopify,
-    ETSY: limits.allowEtsy,
-    TIKTOK: limits.allowTikTok,
-  }
-
-  return platformMap[platform] || false
+  return true // All platforms available
 }
 
 /**
- * Check if user has access to a specific feature
+ * All features available to all users
  */
 export async function checkFeatureAccess(
   userId: string,
   feature: "bulk" | "scheduled" | "analytics" | "api"
 ): Promise<boolean> {
-  const limits = await getUserSubscriptionLimits(userId)
-
-  if (!limits) {
-    return false
-  }
-
-  const featureMap = {
-    bulk: limits.allowBulkOps,
-    scheduled: limits.allowScheduledSync,
-    analytics: limits.allowAdvancedAnalytics,
-    api: limits.allowAPIAccess,
-  }
-
-  return featureMap[feature] || false
+  return true // All features available
 }
 
 /**
@@ -175,7 +186,8 @@ export async function recordProductUsage(
 }
 
 /**
- * Check if user can perform an action (combines all checks)
+ * Check if user can perform an action
+ * In store-based system, all actions are allowed - billing is per-store
  */
 export async function canPerformAction(
   userId: string,
@@ -183,69 +195,22 @@ export async function canPerformAction(
     type: "add_product" | "bulk_operation" | "scheduled_sync" | "api_access"
     platform?: "BIGCOMMERCE" | "SHOPIFY" | "ETSY" | "TIKTOK"
     productCount?: number
+    storeId?: string
   }
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const limits = await getUserSubscriptionLimits(userId)
-
-  if (!limits) {
-    return {
-      allowed: false,
-      reason: "No active subscription found",
-    }
-  }
-
-  // Check product limit for add_product
-  if (action.type === "add_product") {
-    const usage = await checkProductLimit(userId)
+  // In store-based model, all platforms and features are available
+  // Billing is handled per-store via StoreSubscription
+  
+  // If storeId provided, check store-specific limits
+  if (action.storeId && action.type === "add_product") {
+    const storeUsage = await checkStoreProductLimit(action.storeId)
     
     const requiredProducts = action.productCount || 1
     
-    if (!usage.allowed || usage.remaining < requiredProducts) {
+    if (!storeUsage.allowed || (storeUsage.remaining !== -1 && storeUsage.remaining < requiredProducts)) {
       return {
         allowed: false,
-        reason: `Product limit reached. You have ${usage.remaining} products remaining on your ${limits.tier} plan.`,
-      }
-    }
-  }
-
-  // Check platform access
-  if (action.platform) {
-    const hasAccess = await checkPlatformAccess(userId, action.platform)
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        reason: `Your ${limits.tier} plan does not include access to ${action.platform}. Please upgrade to continue.`,
-      }
-    }
-  }
-
-  // Check feature access
-  if (action.type === "bulk_operation") {
-    const hasAccess = await checkFeatureAccess(userId, "bulk")
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        reason: "Bulk operations are only available on Professional and Enterprise plans.",
-      }
-    }
-  }
-
-  if (action.type === "scheduled_sync") {
-    const hasAccess = await checkFeatureAccess(userId, "scheduled")
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        reason: "Scheduled syncs are only available on Professional and Enterprise plans.",
-      }
-    }
-  }
-
-  if (action.type === "api_access") {
-    const hasAccess = await checkFeatureAccess(userId, "api")
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        reason: "API access is only available on Enterprise plan.",
+        reason: `Store product limit reached. This store allows ${storeUsage.limit} products.`,
       }
     }
   }
@@ -257,14 +222,23 @@ export async function canPerformAction(
  * Get usage summary for user dashboard
  */
 export async function getUsageSummary(userId: string) {
-  const [limits, usage, products] = await Promise.all([
-    getUserSubscriptionLimits(userId),
+  const [usage, products, stores] = await Promise.all([
     checkProductLimit(userId),
     db.product.groupBy({
       by: ["platform"],
       where: { userId },
       _count: true,
     }),
+    db.storeConnection.findMany({
+      where: { userId },
+      include: {
+        storeSubscription: {
+          include: {
+            pricingTier: true
+          }
+        }
+      }
+    })
   ])
 
   const platformBreakdown = products.reduce(
@@ -276,18 +250,26 @@ export async function getUsageSummary(userId: string) {
   )
 
   return {
-    tier: limits?.tier || "FREE",
+    tier: "STORE_BASED",
     productUsage: usage,
     platformBreakdown,
+    stores: stores.map(s => ({
+      id: s.id,
+      name: s.storeName,
+      platform: s.platform,
+      productCount: s.productCount,
+      tierName: s.storeSubscription?.pricingTier.name,
+      monthlyPrice: s.storeSubscription ? Number(s.storeSubscription.pricingTier.monthlyPrice) : 0
+    })),
     features: {
-      bigcommerce: limits?.allowBigCommerce || false,
-      shopify: limits?.allowShopify || false,
-      etsy: limits?.allowEtsy || false,
-      tiktok: limits?.allowTikTok || false,
-      bulkOps: limits?.allowBulkOps || false,
-      scheduledSync: limits?.allowScheduledSync || false,
-      analytics: limits?.allowAdvancedAnalytics || false,
-      api: limits?.allowAPIAccess || false,
+      bigcommerce: true,
+      shopify: true,
+      etsy: true,
+      tiktok: true,
+      bulkOps: true,
+      scheduledSync: true,
+      analytics: true,
+      api: true,
     },
   }
 }

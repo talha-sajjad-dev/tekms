@@ -5,11 +5,15 @@ import { auth } from "@/lib/auth"
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Maintenance mode check (using environment variable for edge compatibility)
+  const maintenanceMode = process.env.MAINTENANCE_MODE === 'true'
+  
   // Public routes that don't require authentication
   const publicRoutes = [
     "/",
     "/privacy",
     "/terms",
+    "/maintenance",
     "/api/auth/signin",
     "/api/auth/signup",
     "/api/auth/callback",
@@ -17,11 +21,14 @@ export async function middleware(request: NextRequest) {
     "/api/auth/providers",
     "/api/auth/csrf",
     "/api/auth/register",
+    "/api/settings/public",
+    "/api/maintenance/unlock",
   ]
 
   // Check if route is public or API route (handled by route itself)
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isNextInternal = pathname.startsWith("/_next") || pathname.startsWith("/api/auth/")
+  const isMaintenancePage = pathname === "/maintenance"
 
   // Allow public routes and Next.js internal routes WITHOUT checking session
   // This is critical because auth() uses Prisma which doesn't work in edge middleware
@@ -29,8 +36,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Check for maintenance bypass cookie
+  const maintenanceBypass = request.cookies.get('maintenance_bypass')?.value === 'true'
+  
   // Only call auth() for protected routes
   const session = await auth()
+  
+  // Maintenance mode: redirect non-admins to maintenance page
+  // Allow bypass if they have the correct cookie or are admin
+  if (maintenanceMode && !isMaintenancePage) {
+    if (session?.user?.role !== 'ADMIN' && !maintenanceBypass) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/maintenance"
+      return NextResponse.redirect(url)
+    }
+  }
 
   // Require authentication for all other routes
   if (!session?.user) {

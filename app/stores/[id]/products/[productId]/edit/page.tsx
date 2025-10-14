@@ -86,7 +86,7 @@ export default function ProductEditPage() {
           title: "Success",
           description: "Product updated successfully",
         })
-        router.push(`/stores/${storeId}/products`)
+        router.push(`/products`)
       } else {
         toast({
           title: "Error",
@@ -122,7 +122,7 @@ export default function ProductEditPage() {
       <header className="border-b">
         <div className="px-6 py-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push(`/stores/${storeId}/products`)}>
+            <Button variant="ghost" size="icon" onClick={() => router.push(`/products`)}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex-1">

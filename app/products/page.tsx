@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { BulkPriceDialog } from '@/components/products/BulkPriceDialog'
 import { BulkTagDialog } from '@/components/products/BulkTagDialog'
+import { SyncProgressDialog } from '@/components/products/SyncProgressDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,6 +102,9 @@ export default function ProductsPage() {
   const [showTagDialog, setShowTagDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
+  const [showProgressDialog, setShowProgressDialog] = useState(false)
+  const [syncingStoreId, setSyncingStoreId] = useState<string>('')
+  const [syncingStoreName, setSyncingStoreName] = useState<string>('')
   const [bulkOperating, setBulkOperating] = useState(false)
   const [syncing, setSyncing] = useState(false)
   
@@ -284,42 +288,56 @@ export default function ProductsPage() {
   }
 
   const handlePreviewSync = async (storeId: string) => {
+    const store = stores.find(s => s.id === storeId)
+    if (!store) return
+    
+    console.log('🔄 Starting background sync for:', store.storeName)
     setShowSyncDialog(false)
     setSyncing(true)
+    setSyncingStoreId(storeId)
+    setSyncingStoreName(store.storeName)
+    
     try {
-      toast({ title: 'Syncing...', description: 'Fetching products from BigCommerce. This may take a few minutes...' })
-      
+      // Start background sync
       const res = await fetch(`/api/stores/${storeId}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ background: false })
+        body: JSON.stringify({ background: true })
       })
 
       const data = await res.json()
+      
       if (res.ok) {
-        toast({
-          title: 'Sync Complete! ✅',
-          description: `Successfully synced ${data.productCount || 0} products from BigCommerce`,
-          duration: 5000
-        })
-        fetchStores()
-        fetchProducts()
+        console.log('✅ Background sync started:', data.jobId)
+        // Show progress dialog
+        setShowProgressDialog(true)
       } else {
+        console.log('❌ Sync failed to start:', data.error)
         toast({
           title: 'Sync Failed',
-          description: data.error || 'Failed to sync products. Please try again.',
+          description: data.error || 'Failed to start sync. Please try again.',
           variant: 'destructive',
           duration: 7000
         })
       }
     } catch (error) {
+      console.error('❌ Sync error:', error)
       toast({
         title: 'Error',
-        description: 'Network error while syncing. Please check your connection.',
+        description: 'Network error while starting sync. Please check your connection.',
         variant: 'destructive'
       })
     } finally {
       setSyncing(false)
+    }
+  }
+  
+  const handleProgressDialogClose = (open: boolean) => {
+    setShowProgressDialog(open)
+    if (!open) {
+      // Refresh data when dialog closes
+      fetchStores()
+      fetchProducts()
     }
   }
 
@@ -1001,6 +1019,14 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Sync Progress Dialog */}
+      <SyncProgressDialog
+        open={showProgressDialog}
+        onOpenChange={handleProgressDialogClose}
+        storeId={syncingStoreId}
+        storeName={syncingStoreName}
+      />
 
     </div>
   )
