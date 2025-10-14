@@ -81,8 +81,25 @@
 
 ## 🚧 In Progress Tasks
 
-### 4. Master Product Creation UI
-**Status:** NOT STARTED  
+### 4. BigCommerce Publisher ✅
+**Status:** COMPLETED
+**Completed:** 2025-01-14
+
+- ✅ Created publisher service ([`lib/publishers/bigcommerce-publisher.ts`](../lib/publishers/bigcommerce-publisher.ts))
+- ✅ Transform master product to BigCommerce format
+- ✅ Create products via BigCommerce API
+- ✅ Handle variants and images
+- ✅ Create channel listings
+- ✅ Update and unpublish functions
+- ✅ Error handling and logging
+- ✅ Created publish API endpoint ([`app/api/products/master/[id]/publish/route.ts`](../app/api/products/master/[id]/publish/route.ts))
+
+**Files Created:**
+- `lib/publishers/bigcommerce-publisher.ts` - Core publisher logic
+- `app/api/products/master/[id]/publish/route.ts` - Publish API endpoint
+
+### 5. Master Product Creation UI
+**Status:** NOT STARTED
 **Next Steps:**
 - Create product creation form
 - Build variant generator interface
@@ -90,17 +107,8 @@
 - Implement SKU auto-generation
 - Add template selection
 
-### 5. BigCommerce Publisher
-**Status:** NOT STARTED  
-**Next Steps:**
-- Create publisher service
-- Implement product creation API call
-- Handle variant publishing
-- Error handling and retry logic
-- Status tracking
-
-### 6. Shopify Publisher  
-**Status:** NOT STARTED  
+### 6. Shopify Publisher
+**Status:** NOT STARTED
 **Next Steps:**
 - Create publisher service
 - Implement product creation API call
