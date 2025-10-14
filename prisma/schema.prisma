@@ -40,6 +40,16 @@ model User {
   savedFilters     SavedFilter[]
   aiOperations     AIOperation[]
   
+  // POD Platform Relations
+  masterProducts   MasterProduct[]
+  channelListings  ChannelListing[]
+  categoryMappings CategoryMapping[]
+  pricingRules     PricingRule[]
+  productTemplates ProductTemplate[]
+  designLibrary    DesignLibrary[]
+  inventoryLevels  InventoryLevel[]
+  changeLogs       ChangeLog[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -253,6 +263,8 @@ model StoreConnection {
   
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   products           Product[]
+  channelListings    ChannelListing[]
+  webhookEvents      WebhookEvent[]
   storeSubscription  StoreSubscription?
   
   createdAt DateTime @default(now())
@@ -367,8 +379,14 @@ model Product {
   syncStatus       String?
   syncError        String?
   
+  // Reference to master product (if this is a synced product)
+  masterProductId  String?
+  channelListingId String?
+  
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   storeConnection StoreConnection? @relation(fields: [storeConnectionId], references: [id])
+  masterProduct   MasterProduct?   @relation(fields: [masterProductId], references: [id], onDelete: SetNull)
+  channelListing  ChannelListing?  @relation(fields: [channelListingId], references: [id], onDelete: SetNull)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -620,4 +638,366 @@ enum ProductStatus {
   ERROR
   SYNCING
   PENDING_APPROVAL
+}
+
+// ============================================
+// POD PLATFORM - MASTER PRODUCTS & CHANNELS
+// ============================================
+
+// Master Product (Source of Truth)
+model MasterProduct {
+  id                String   @id @default(cuid())
+  userId            String
+  
+  // Core fields
+  title             String
+  description       String?  @db.Text
+  baseSKU           String
+  basePrice         Decimal  @db.Decimal(10, 2)
+  compareAtPrice    Decimal? @db.Decimal(10, 2)
+  
+  // Classification
+  category          String?
+  tags              String[]
+  
+  // Design & Template
+  templateId        String?
+  designIds         String[] // References to DesignLibrary
+  
+  // Media
+  images            Json?    // Array of image URLs
+  
+  // Status
+  status            ProductStatus @default(DRAFT)
+  
+  // Relations
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template          ProductTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  variants          MasterVariant[]
+  channelListings   ChannelListing[]
+  inventoryLevels   InventoryLevel[]
+  legacyProducts    Product[]         // Backward compatibility
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId, status])
+  @@index([baseSKU])
+  @@index([userId, createdAt])
+}
+
+// Channel Listing (Platform-specific instance)
+model ChannelListing {
+  id                String   @id @default(cuid())
+  userId            String   // Denormalized for queries
+  masterProductId   String
+  storeConnectionId String
+  platform          Platform
+  externalId        String?  // ID on the platform (null until published)
+  
+  // Platform-specific overrides
+  titleOverride      String?
+  descriptionOverride String? @db.Text
+  priceOverride      Decimal? @db.Decimal(10, 2)
+  
+  // Platform metadata
+  platformCategories String[]
+  platformTags       String[]
+  platformData       Json?    // Platform-specific fields
+  
+  // Publishing
+  publishStatus      String   @default("draft")  // draft, published, failed, syncing
+  publishError       String?  @db.Text
+  lastPushedAt       DateTime?
+  lastPulledAt       DateTime?
+  
+  // Relations
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  masterProduct     MasterProduct   @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  storeConnection   StoreConnection @relation(fields: [storeConnectionId], references: [id], onDelete: Cascade)
+  channelVariants   ChannelVariant[]
+  legacyProducts    Product[]        // Backward compatibility
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([storeConnectionId, externalId])
+  @@index([userId])
+  @@index([masterProductId])
+  @@index([publishStatus])
+  @@index([storeConnectionId, publishStatus])
+}
+
+// Master Variant (Product variations)
+model MasterVariant {
+  id              String   @id @default(cuid())
+  masterProductId String
+  
+  // Variant definition
+  optionValues    Json     // { "Color": "Red", "Size": "Large" }
+  
+  // Variant specifics
+  sku             String   @unique
+  price           Decimal? @db.Decimal(10, 2)  // Override if different from base
+  compareAtPrice  Decimal? @db.Decimal(10, 2)
+  
+  // Images
+  imageOverrides  String[] // Specific images for this variant
+  
+  // Relations
+  masterProduct   MasterProduct    @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  inventoryLevel  InventoryLevel?
+  channelVariants ChannelVariant[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([masterProductId])
+  @@index([sku])
+}
+
+// Channel Variant (Platform-specific variant)
+model ChannelVariant {
+  id                String  @id @default(cuid())
+  masterVariantId   String
+  channelListingId  String
+  externalId        String  // Platform's variant ID
+  
+  // Platform-specific overrides
+  platformSKU       String?
+  platformPrice     Decimal? @db.Decimal(10, 2)
+  platformData      Json?
+  
+  // Relations
+  masterVariant     MasterVariant  @relation(fields: [masterVariantId], references: [id], onDelete: Cascade)
+  channelListing    ChannelListing @relation(fields: [channelListingId], references: [id], onDelete: Cascade)
+  
+  @@unique([channelListingId, externalId])
+  @@index([masterVariantId])
+  @@index([channelListingId])
+}
+
+// Inventory Management
+model InventoryLevel {
+  id                String   @id @default(cuid())
+  userId            String
+  masterProductId   String?  // For simple products
+  masterVariantId   String?  // For variants
+  
+  // Master inventory
+  totalQuantity     Int      @default(0)
+  allocated         Int      @default(0)  // Reserved for orders
+  available         Int      @default(0)  // Computed: total - allocated
+  
+  // Per-channel allocation
+  channelAllocations Json?   // { "storeId1": 10, "storeId2": 5 }
+  
+  // Safety stock
+  lowStockThreshold Int      @default(5)
+  safetyStock       Int      @default(0)
+  
+  // Status
+  trackInventory    Boolean  @default(true)
+  allowBackorder    Boolean  @default(false)
+  
+  // Relations
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  masterProduct   MasterProduct? @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  masterVariant   MasterVariant? @relation(fields: [masterVariantId], references: [id], onDelete: Cascade)
+  
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  
+  @@unique([masterProductId])
+  @@unique([masterVariantId])
+  @@index([userId])
+  @@index([available])
+}
+
+// Pricing Rules
+model PricingRule {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  
+  // Rule scope
+  appliesTo       String   // "all", "specific_stores", "specific_products", "tagged"
+  storeIds        String[]
+  productIds      String[]
+  tags            String[] // Apply to products with these tags
+  
+  // Rule logic
+  ruleType        String   // "markup_percent", "markup_fixed", "set_price", "round_up", "round_down"
+  value           Decimal  @db.Decimal(10, 2)
+  
+  // Platform-specific overrides
+  platformRules   Json?    // { "ETSY": { type: "markup_percent", value: 10 } }
+  
+  // Status
+  isActive        Boolean  @default(true)
+  priority        Int      @default(0)  // Higher = applied first
+  
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, isActive])
+  @@index([priority])
+}
+
+// Product Templates (for POD)
+model ProductTemplate {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  category        String?  // "apparel", "accessories", etc.
+  
+  // Default settings
+  basePrice       Decimal  @db.Decimal(10, 2)
+  priceBySize     Json?    // { "S": 0, "M": 2, "L": 4, "XL": 6 }
+  
+  // Variant options
+  variantOptions  Json     // { "Color": ["Red", "Blue"], "Size": ["S", "M", "L"] }
+  
+  // Design placeholders
+  designSlots     Json?    // Where designs can be placed
+  
+  // Shipping
+  weight          Decimal? @db.Decimal(10, 2)
+  dimensions      Json?    // { length, width, height }
+  
+  // Platform defaults
+  defaultTags     String[]
+  defaultCategories Json?  // Platform-specific
+  
+  // Usage
+  isActive        Boolean  @default(true)
+  useCount        Int      @default(0)
+  
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products        MasterProduct[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId, isActive])
+  @@index([category])
+}
+
+// Design Library (for POD)
+model DesignLibrary {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  
+  // File info
+  fileUrl         String   // S3/Cloud Storage
+  thumbnailUrl    String?
+  fileType        String   // "png", "svg", "psd", "ai"
+  fileSize        Int?     // bytes
+  
+  // Metadata
+  tags            String[]
+  collections     String[]
+  
+  // Usage
+  usedInProducts  String[] // MasterProduct IDs
+  
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([tags])
+}
+
+// Category Mappings
+model CategoryMapping {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String   // User's category name
+  
+  // Platform-specific IDs
+  etsyTaxonomyId  Int?
+  bcCategoryId    Int?
+  shopifyCollection String?
+  tiktokCategoryId String?
+  
+  // Auto-mapping rules
+  keywords        String[] // Keywords to auto-detect
+  pattern         String?  // Regex pattern
+  
+  // Stats
+  timesUsed       Int      @default(0)
+  
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([name])
+}
+
+// Change Log (Audit Trail)
+model ChangeLog {
+  id              String   @id @default(cuid())
+  userId          String
+  entityType      String   // "product", "variant", "inventory", "price"
+  entityId        String
+  
+  // Change details
+  field           String
+  oldValue        Json?
+  newValue        Json?
+  
+  // Source tracking
+  source          String   // "user", "sync", "webhook", "bulk_op"
+  sourceId        String?  // Bulk operation ID, sync job ID, etc.
+  platform        Platform?
+  
+  // Relations
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([userId, entityType, entityId])
+  @@index([createdAt])
+  @@index([source])
+}
+
+// Webhook Events
+model WebhookEvent {
+  id                String   @id @default(cuid())
+  storeConnectionId String?
+  platform          Platform
+  eventType         String   // "product.updated", "inventory.updated", "order.created"
+  
+  // Payload
+  payload           Json
+  signature         String?  // For verification
+  
+  // Processing
+  processed         Boolean  @default(false)
+  processedAt       DateTime?
+  processingError   String?  @db.Text
+  retryCount        Int      @default(0)
+  
+  // Relations
+  storeConnection StoreConnection? @relation(fields: [storeConnectionId], references: [id], onDelete: Cascade)
+  
+  receivedAt      DateTime @default(now())
+  
+  @@index([platform, processed])
+  @@index([receivedAt])
+  @@index([storeConnectionId, processed])
 }

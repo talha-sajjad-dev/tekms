@@ -35,18 +35,19 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions) {
     await transporter.verify()
 
     // Send email
+    const fromAddress = config.fromEmail || 'noreply@tekms.com'
     const info = await transporter.sendMail({
       from: config.fromName
-        ? `"${config.fromName}" <${config.fromEmail}>`
-        : config.fromEmail,
+        ? `"${config.fromName}" <${fromAddress}>`
+        : fromAddress,
       to,
       subject,
-      text: text || html.replace(/<[^>]*>/g, ''), // Fallback to HTML with tags stripped
+      text: text || html.replace(/<[^>]*>/g, ''),
       html,
     })
 
     console.log('Email sent:', info.messageId)
-    return { success: true, messageId: info.messageId }
+    return { success: true, messageId: info.messageId || 'sent' }
   } catch (error: any) {
     console.error('Email send error:', error)
     throw new Error(`Failed to send email: ${error.message}`)
