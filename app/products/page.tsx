@@ -11,6 +11,10 @@ import { useToast } from '@/hooks/use-toast'
 import { BulkPriceDialog } from '@/components/products/BulkPriceDialog'
 import { BulkTagDialog } from '@/components/products/BulkTagDialog'
 import { SyncProgressDialog } from '@/components/products/SyncProgressDialog'
+import { CreateProductModal } from '@/components/products/CreateProductModal'
+import { PricingRulesModal } from '@/components/products/PricingRulesModal'
+import { TemplatesModal } from '@/components/products/TemplatesModal'
+import { CategoryMappingsModal } from '@/components/products/CategoryMappingsModal'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +45,11 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
-  Save
+  Save,
+  Plus,
+  Calculator,
+  FileText,
+  Sparkles
 } from 'lucide-react'
 
 interface Product {
@@ -107,6 +115,12 @@ export default function ProductsPage() {
   const [syncingStoreName, setSyncingStoreName] = useState<string>('')
   const [bulkOperating, setBulkOperating] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  
+  // POD Modal states
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false)
+  const [showPricingRulesModal, setShowPricingRulesModal] = useState(false)
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false)
+  const [showCategoryMappingsModal, setShowCategoryMappingsModal] = useState(false)
   
   // Quick edit state
   const [editedName, setEditedName] = useState('')
@@ -688,15 +702,28 @@ export default function ProductsPage() {
               Delete
             </Button>
             <div className="flex-1" />
+            
+            {/* POD Feature Buttons */}
+            <Button size="sm" variant="outline" onClick={() => setShowCreateProductModal(true)} className="border-blue-200 hover:bg-blue-50">
+              <Plus className="h-3 w-3 mr-1" />
+              Create
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowPricingRulesModal(true)} className="border-purple-200 hover:bg-purple-50">
+              <Calculator className="h-3 w-3 mr-1" />
+              Pricing
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowTemplatesModal(true)} className="border-green-200 hover:bg-green-50">
+              <FileText className="h-3 w-3 mr-1" />
+              Templates
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowCategoryMappingsModal(true)} className="border-orange-200 hover:bg-orange-50">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Categories
+            </Button>
+            
             <span className="text-xs text-muted-foreground">
               Page {page} of {totalPages}
             </span>
-            <Button size="sm" variant="outline" onClick={() => router.push('/products/master/create')}>
-              ✨ Create Product
-            </Button>
-            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-600" onClick={() => router.push('/stores')}>
-              + Connect Store
-            </Button>
           </div>
 
           {/* Quick Filters */}
@@ -1029,6 +1056,31 @@ export default function ProductsPage() {
         onOpenChange={handleProgressDialogClose}
         storeId={syncingStoreId}
         storeName={syncingStoreName}
+      />
+      
+      {/* POD Feature Modals */}
+      <CreateProductModal
+        open={showCreateProductModal}
+        onOpenChange={setShowCreateProductModal}
+        onSuccess={() => {
+          fetchProducts()
+          fetchStores()
+        }}
+      />
+      
+      <PricingRulesModal
+        open={showPricingRulesModal}
+        onOpenChange={setShowPricingRulesModal}
+      />
+      
+      <TemplatesModal
+        open={showTemplatesModal}
+        onOpenChange={setShowTemplatesModal}
+      />
+      
+      <CategoryMappingsModal
+        open={showCategoryMappingsModal}
+        onOpenChange={setShowCategoryMappingsModal}
       />
 
     </div>
