@@ -29,12 +29,13 @@ export async function getTikTokAuthUrl(state: string): Promise<string> {
     redirect_uri: redirectUri,
   })
   
-  // Use sandbox URL for testing, production URL for live
-  const authBaseUrl = isSandbox
-    ? 'https://sandbox-services.tiktokshop.com/open/authorize'
-    : 'https://services.tiktokshop.com/open/authorize'
+  // TikTok Shop uses the SAME OAuth URL for both sandbox and production
+  // They're differentiated by the App Key credentials only
+  const authBaseUrl = 'https://services.tiktokshop.com/open/authorize'
   
-  console.log(`🎯 TikTok OAuth: Using ${environment} environment with app_key: ${clientKey.substring(0, 10)}...`)
+  console.log(`🎯 TikTok OAuth: Using ${environment} environment`)
+  console.log(`   App Key: ${clientKey.substring(0, 10)}...`)
+  console.log(`   Auth URL: ${authBaseUrl}`)
   
   return `${authBaseUrl}?${params.toString()}`
 }
@@ -75,10 +76,10 @@ export async function handleTikTokCallback(
     .update(signString)
     .digest('hex')
   
-  // Use appropriate token URL based on environment
-  const tokenUrl = isSandbox
-    ? 'https://sandbox-auth.tiktok-shops.com/api/v2/token/get'
-    : 'https://auth.tiktok-shops.com/api/v2/token/get'
+  // TikTok Shop uses the same token URL for both environments
+  const tokenUrl = 'https://auth.tiktok-shops.com/api/v2/token/get'
+  
+  console.log(`🔄 Exchanging code for token (${environment} environment)`)
   
   // Exchange code for access token
   const tokenResponse = await fetch(tokenUrl, {
@@ -105,10 +106,13 @@ export async function handleTikTokCallback(
   
   const { access_token, refresh_token, access_token_expire_in } = tokenData.data
   
-  // Use sandbox API URL for testing
+  // API calls should use sandbox URL if testing
+  // Note: This might need adjustment based on TikTok's actual sandbox API
   const apiBaseUrl = isSandbox
-    ? 'https://sandbox-open-api.tiktokglobalshop.com'
+    ? 'https://sandbox-api.tiktok-shops.com'
     : 'https://open-api.tiktokglobalshop.com'
+  
+  console.log(`🔄 Fetching shop info from ${apiBaseUrl}`)
   
   // Get shop information
   const shopResponse = await fetch(`${apiBaseUrl}/api/shop/get_authorized_shop`, {
