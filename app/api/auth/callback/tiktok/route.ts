@@ -60,3 +60,29 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
+/**
+ * Handle TikTok verification/webhook POST requests
+ * POST /api/auth/callback/tiktok
+ */
+export async function POST(req: NextRequest) {
+  try {
+    console.log('📥 TikTok POST request received (verification or webhook)')
+    const body = await req.json().catch(() => ({}))
+    console.log('   Body:', body)
+    
+    // TikTok may send verification challenges
+    // Return success to pass verification
+    return NextResponse.json({
+      success: true,
+      message: 'Endpoint verified'
+    }, { status: 200 })
+    
+  } catch (error) {
+    console.error('TikTok POST handler error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal error' },
+      { status: 500 }
+    )
+  }
+}
