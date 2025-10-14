@@ -1,5 +1,7 @@
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
+import { InventoryService } from '@/lib/inventory/inventory-service'
+import { suggestCategories, applyCategoryToProduct } from '@/lib/categories/category-mapper'
 
 /**
  * BigCommerce Publisher Service
@@ -168,10 +170,35 @@ export async function publishToBigCommerce(
       }
     }
     
-    // 4. Transform master product to BigCommerce format
-    const bcProduct = transformToBigCommerceFormat(masterProduct)
+    // 4. Auto-apply category mapping
+    let categoryIds: number[] = []
+    try {
+      console.log(`🏷️  Auto-mapping categories for: ${masterProduct.title}`)
+      const suggestions = await suggestCategories(
+        userId,
+        masterProduct.title,
+        masterProduct.description || undefined,
+        'BIGCOMMERCE'
+      )
+      
+      if (suggestions.length > 0) {
+        const topSuggestion = suggestions[0]
+        console.log(`   Found category: ${topSuggestion.name} (confidence: ${topSuggestion.confidence}%)`)
+        
+        if (topSuggestion.bcCategoryId) {
+          categoryIds = [topSuggestion.bcCategoryId]
+          console.log(`   ✅ Applied BigCommerce category ID: ${topSuggestion.bcCategoryId}`)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to auto-map categories:', error)
+      // Continue without categories
+    }
     
-    // 5. Create product via BigCommerce API
+    // 5. Transform master product to BigCommerce format
+    const bcProduct = transformToBigCommerceFormat(masterProduct, categoryIds)
+    
+    // 6. Create product via BigCommerce API
     const accessToken = decrypt(store.accessToken)
     const storeHash = store.externalStoreId
     
@@ -210,7 +237,7 @@ export async function publishToBigCommerce(
       }
     }
     
-    // 6. Create or update channel listing
+    // 7. Create or update channel listing
     const channelListing = existingListing
       ? await db.channelListing.update({
           where: { id: existingListing.id },
@@ -235,7 +262,7 @@ export async function publishToBigCommerce(
           }
         })
     
-    // 7. Create channel variants if master has variants
+    // 8. Create channel variants if master has variants
     if (masterProduct.variants.length > 0 && result.data?.variants) {
       for (let i = 0; i < masterProduct.variants.length; i++) {
         const masterVariant = masterProduct.variants[i]
@@ -256,7 +283,7 @@ export async function publishToBigCommerce(
       }
     }
     
-    // 8. Log the change
+    // 9. Log the change
     await db.changeLog.create({
       data: {
         userId: userId,
@@ -277,6 +304,16 @@ export async function publishToBigCommerce(
     console.log(`✅ Successfully published product ${masterProduct.title} to BigCommerce`)
     console.log(`   External ID: ${externalId}`)
     console.log(`   Channel Listing ID: ${channelListing.id}`)
+    
+    // Auto-sync inventory after publishing
+    try {
+      console.log(`📦 Auto-syncing inventory for product ${masterProduct.title}`)
+      await InventoryService.syncToBigCommerce(channelListing.id, userId)
+      console.log(`✅ Inventory synced successfully`)
+    } catch (invError) {
+      console.error('Failed to auto-sync inventory:', invError)
+      // Don't fail the publish if inventory sync fails
+    }
     
     return {
       success: true,
@@ -301,7 +338,7 @@ export async function publishToBigCommerce(
 /**
  * Transform master product to BigCommerce format
  */
-function transformToBigCommerceFormat(masterProduct: any): BigCommerceProduct {
+function transformToBigCommerceFormat(masterProduct: any, categoryIds: number[] = []): BigCommerceProduct {
   const images = masterProduct.images?.images || masterProduct.images || []
   
   const bcProduct: BigCommerceProduct = {
@@ -317,7 +354,7 @@ function transformToBigCommerceFormat(masterProduct: any): BigCommerceProduct {
     is_visible: masterProduct.status === 'PUBLISHED',
     is_featured: false,
     condition: 'New',
-    categories: [], // Will be mapped via CategoryMapping later
+    categories: categoryIds,
     
     // SEO fields
     page_title: masterProduct.title,

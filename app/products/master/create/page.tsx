@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,8 @@ import {
   Send,
   ArrowLeft,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react'
 
 interface Variant {
@@ -51,10 +52,29 @@ interface Store {
   isActive: boolean
 }
 
+interface ProductTemplate {
+  id: string
+  name: string
+  description?: string
+  category?: string
+  basePrice: string
+  priceBySize?: Record<string, number>
+  variantOptions: Record<string, string[]>
+  weight?: string
+  defaultTags: string[]
+}
+
 export default function CreateMasterProductPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session, status } = useSession()
   const { toast } = useToast()
+  
+  // Template support
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+  const [templates, setTemplates] = useState<ProductTemplate[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<ProductTemplate | null>(null)
   
   // Form state
   const [title, setTitle] = useState('')
@@ -87,10 +107,129 @@ export default function CreateMasterProductPage() {
   const [publishing, setPublishing] = useState(false)
   const [loadingStores, setLoadingStores] = useState(false)
   
+  // Load template if templateId in URL
+  useEffect(() => {
+    const templateId = searchParams.get('templateId')
+    if (templateId) {
+      loadTemplateById(templateId)
+    }
+  }, [searchParams])
+  
   // Redirect if not authenticated
   if (status === 'unauthenticated') {
     router.push('/')
     return null
+  }
+  
+  // Load template by ID
+  const loadTemplateById = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/templates/${templateId}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        applyTemplate(data.template)
+      } else {
+        toast({
+          title: 'Template Not Found',
+          description: 'Could not load the selected template',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      console.error('Error loading template:', error)
+    }
+  }
+  
+  // Load templates list
+  const loadTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const response = await fetch('/api/templates?isActive=true')
+      const data = await response.json()
+      
+      if (data.success) {
+        setTemplates(data.templates)
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error)
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+  
+  // Apply template to form
+  const applyTemplate = (template: ProductTemplate) => {
+    setTitle('')  // User should provide their own title
+    setDescription(template.description || '')
+    setCategory(template.category || '')
+    setBasePrice(template.basePrice)
+    setTags(template.defaultTags.join(', '))
+    setSelectedTemplate(template)
+    
+    // Generate variants from template
+    generateVariantsFromTemplate(template)
+    
+    toast({
+      title: 'Template Applied!',
+      description: `Using "${template.name}" template with ${Object.keys(template.variantOptions).length} variant options`,
+    })
+  }
+  
+  // Generate variants from template options
+  const generateVariantsFromTemplate = (template: ProductTemplate) => {
+    const variantOptions = template.variantOptions
+    const priceBySize = template.priceBySize || {}
+    const basePrice = parseFloat(template.basePrice)
+    
+    // Generate all combinations
+    const optionNames = Object.keys(variantOptions)
+    const combinations: Array<Record<string, string>> = []
+    
+    const generateCombinations = (index: number, current: Record<string, string>) => {
+      if (index === optionNames.length) {
+        combinations.push({ ...current })
+        return
+      }
+      
+      const optionName = optionNames[index]
+      const optionValues = variantOptions[optionName]
+      
+      for (const value of optionValues) {
+        current[optionName] = value
+        generateCombinations(index + 1, current)
+      }
+    }
+    
+    generateCombinations(0, {})
+    
+    // Create variant objects
+    const generatedVariants: Variant[] = combinations.map((combo) => {
+      // Calculate price based on size if applicable
+      let variantPrice = basePrice
+      const size = combo.Size || combo.size
+      if (size && priceBySize[size] !== undefined) {
+        variantPrice = basePrice + priceBySize[size]
+      }
+      
+      // Generate SKU
+      const optionSuffix = Object.values(combo).join('-').replace(/[^a-zA-Z0-9]/g, '-')
+      const sku = `${baseSKU || 'PRODUCT'}-${optionSuffix}`.toUpperCase()
+      
+      return {
+        id: Math.random().toString(36).substring(7),
+        sku,
+        optionValues: combo,
+        price: variantPrice.toFixed(2),
+        compareAtPrice: undefined
+      }
+    })
+    
+    setVariants(generatedVariants)
+    toast({
+      title: 'Variants Generated',
+      description: `Created ${generatedVariants.length} variants from template`,
+    })
   }
   
   // Generate SKU from title
@@ -279,11 +418,26 @@ export default function CreateMasterProductPage() {
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <Package className="h-6 w-6" />
                 Create New Product
+                {selectedTemplate && (
+                  <Badge variant="secondary" className="text-xs">
+                    From: {selectedTemplate.name}
+                  </Badge>
+                )}
               </h1>
               <p className="text-sm text-muted-foreground">
                 Create once, publish to multiple platforms
               </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                loadTemplates()
+                setShowTemplateDialog(true)
+              }}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Use Template
+            </Button>
           </div>
         </div>
       </header>
@@ -702,6 +856,79 @@ export default function CreateMasterProductPage() {
               ) : (
                 <><Send className="h-4 w-4 mr-2" />Publish to {selectedStores.length} Store(s)</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Template Selector Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Choose a Template</DialogTitle>
+            <DialogDescription>
+              Select a product template to quickly set up your product
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingTemplates ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : templates.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground mb-4">No templates available</p>
+              <Button variant="outline" onClick={() => router.push('/templates')}>
+                Create a Template
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              {templates.map((template) => (
+                <Card
+                  key={template.id}
+                  className="cursor-pointer hover:border-primary transition-colors"
+                  onClick={() => {
+                    applyTemplate(template)
+                    setShowTemplateDialog(false)
+                  }}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-base">{template.name}</CardTitle>
+                    {template.description && (
+                      <CardDescription className="text-sm">
+                        {template.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Base Price:</span>
+                      <span className="font-medium">${template.basePrice}</span>
+                    </div>
+                    {template.category && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Category:</span>
+                        <Badge variant="outline" className="text-xs">{template.category}</Badge>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {Object.keys(template.variantOptions).map(key => (
+                        <Badge key={key} variant="secondary" className="text-xs">
+                          {key}: {template.variantOptions[key].length}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

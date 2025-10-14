@@ -1,5 +1,7 @@
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
+import { InventoryService } from '@/lib/inventory/inventory-service'
+import { suggestCategories } from '@/lib/categories/category-mapper'
 
 /**
  * Shopify Publisher Service
@@ -110,10 +112,35 @@ export async function publishToShopify(
       }
     }
     
-    // 4. Transform master product to Shopify format
+    // 4. Auto-apply category mapping
+    let collectionHandle: string | undefined
+    try {
+      console.log(`🏷️  Auto-mapping categories for: ${masterProduct.title}`)
+      const suggestions = await suggestCategories(
+        userId,
+        masterProduct.title,
+        masterProduct.description || undefined,
+        'SHOPIFY'
+      )
+      
+      if (suggestions.length > 0) {
+        const topSuggestion = suggestions[0]
+        console.log(`   Found category: ${topSuggestion.name} (confidence: ${topSuggestion.confidence}%)`)
+        
+        if (topSuggestion.shopifyCollection) {
+          collectionHandle = topSuggestion.shopifyCollection
+          console.log(`   ✅ Will add to Shopify collection: ${collectionHandle}`)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to auto-map categories:', error)
+      // Continue without collection
+    }
+    
+    // 5. Transform master product to Shopify format
     const shopifyProduct = transformToShopifyFormat(masterProduct)
     
-    // 5. Create product via Shopify API
+    // 6. Create product via Shopify API
     const accessToken = decrypt(store.accessToken)
     const shopDomain = store.storeUrl || store.externalStoreId
     
@@ -176,8 +203,24 @@ export async function publishToShopify(
             platformData: result.product
           }
         })
-    
-    // 7. Create channel variants if master has variants
+   
+   // 7. Add to collection if mapped
+   if (collectionHandle && result.product?.id) {
+     try {
+       await addProductToShopifyCollection(
+         accessToken,
+         shopDomain,
+         result.product.id.toString(),
+         collectionHandle
+       )
+       console.log(`   ✅ Added product to collection: ${collectionHandle}`)
+     } catch (collError) {
+       console.error('Failed to add to collection:', collError)
+       // Don't fail publish if collection add fails
+     }
+   }
+   
+   // 8. Create channel variants if master has variants
     if (masterProduct.variants.length > 0 && result.product?.variants) {
       for (let i = 0; i < masterProduct.variants.length; i++) {
         const masterVariant = masterProduct.variants[i]
@@ -198,7 +241,7 @@ export async function publishToShopify(
       }
     }
     
-    // 8. Log the change
+    // 9. Log the change
     await db.changeLog.create({
       data: {
         userId: userId,
@@ -219,6 +262,16 @@ export async function publishToShopify(
     console.log(`✅ Successfully published product ${masterProduct.title} to Shopify`)
     console.log(`   External ID: ${externalId}`)
     console.log(`   Channel Listing ID: ${channelListing.id}`)
+    
+    // Auto-sync inventory after publishing
+    try {
+      console.log(`📦 Auto-syncing inventory for product ${masterProduct.title}`)
+      await InventoryService.syncToShopify(channelListing.id, userId)
+      console.log(`✅ Inventory synced successfully`)
+    } catch (invError) {
+      console.error('Failed to auto-sync inventory:', invError)
+      // Don't fail the publish if inventory sync fails
+    }
     
     return {
       success: true,
@@ -329,6 +382,98 @@ function transformToShopifyFormat(masterProduct: any): ShopifyProduct {
   }
   
   return shopifyProduct
+}
+
+/**
+ * Add product to Shopify collection (smart collection)
+ */
+async function addProductToShopifyCollection(
+  accessToken: string,
+  shopDomain: string,
+  productId: string,
+  collectionHandle: string
+): Promise<void> {
+  // First, get collection ID by handle
+  const collectionsResponse = await fetch(
+    `https://${shopDomain}/admin/api/2024-01/smart_collections.json?handle=${collectionHandle}`,
+    {
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Accept': 'application/json'
+      }
+    }
+  )
+  
+  if (!collectionsResponse.ok) {
+    // Try custom collections instead
+    const customResponse = await fetch(
+      `https://${shopDomain}/admin/api/2024-01/custom_collections.json?handle=${collectionHandle}`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Accept': 'application/json'
+        }
+      }
+    )
+    
+    if (!customResponse.ok) {
+      throw new Error(`Collection '${collectionHandle}' not found`)
+    }
+    
+    const customData = await customResponse.json()
+    const collectionId = customData.custom_collections?.[0]?.id
+    
+    if (!collectionId) {
+      throw new Error(`Collection '${collectionHandle}' not found`)
+    }
+    
+    // Add product to custom collection
+    await fetch(
+      `https://${shopDomain}/admin/api/2024-01/collects.json`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          collect: {
+            product_id: parseInt(productId),
+            collection_id: collectionId
+          }
+        })
+      }
+    )
+    
+    return
+  }
+  
+  const collectionsData = await collectionsResponse.json()
+  const collectionId = collectionsData.smart_collections?.[0]?.id
+  
+  if (!collectionId) {
+    throw new Error(`Collection '${collectionHandle}' not found`)
+  }
+  
+  // Add product to smart collection via collect
+  await fetch(
+    `https://${shopDomain}/admin/api/2024-01/collects.json`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        collect: {
+          product_id: parseInt(productId),
+          collection_id: collectionId
+        }
+      })
+    }
+  )
 }
 
 /**
