@@ -17,6 +17,7 @@ import { TemplatesModal } from '@/components/products/TemplatesModal'
 import { CategoryMappingsModal } from '@/components/products/CategoryMappingsModal'
 import { ActionMenu } from '@/components/products/ActionMenu'
 import { ApplyPricingDialog } from '@/components/products/ApplyPricingDialog'
+import { BulkImageDialog } from '@/components/products/BulkImageDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -129,6 +130,7 @@ export default function ProductsPage() {
   const [showStoreActionMenu, setShowStoreActionMenu] = useState(false)
   const [selectedStoreForAction, setSelectedStoreForAction] = useState<string>('')
   const [showApplyPricingDialog, setShowApplyPricingDialog] = useState(false)
+  const [showBulkImageDialog, setShowBulkImageDialog] = useState(false)
   
   // Quick edit state
   const [editedName, setEditedName] = useState('')
@@ -1137,7 +1139,9 @@ export default function ProductsPage() {
         open={showActionMenu}
         onOpenChange={setShowActionMenu}
         onSelect={(actionId) => {
-          if (actionId === 'apply_pricing') {
+          if (actionId === 'add_images') {
+            setShowBulkImageDialog(true)
+          } else if (actionId === 'apply_pricing') {
             setShowApplyPricingDialog(true)
           } else if (actionId === 'apply_category') {
             toast({
@@ -1156,6 +1160,16 @@ export default function ProductsPage() {
         title={selectedProducts.size === 1 ? 'Edit Product' : 'Bulk Edit Products'}
         description={selectedProducts.size === 1 ? 'Choose an action to apply' : `Choose an action to apply to ${selectedProducts.size} products`}
         selectedCount={selectedProducts.size}
+      />
+      
+      <BulkImageDialog
+        open={showBulkImageDialog}
+        onOpenChange={setShowBulkImageDialog}
+        productIds={Array.from(selectedProducts)}
+        onSuccess={() => {
+          fetchProducts()
+          setSelectedProducts(new Set())
+        }}
       />
       
       <ApplyPricingDialog

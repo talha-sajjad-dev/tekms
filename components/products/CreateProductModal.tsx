@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Package, Plus, X, Save, Send, Loader2 } from 'lucide-react'
+import { Package, Plus, X, Save, Send, Loader2, Upload, Image as ImageIcon } from 'lucide-react'
 
 interface Variant {
   id: string
@@ -58,6 +58,7 @@ export function CreateProductModal({ open, onOpenChange, onSuccess }: Props) {
   const [category, setCategory] = useState('')
   const [tags, setTags] = useState('')
   const [productStatus, setProductStatus] = useState<'DRAFT' | 'PUBLISHED'>('DRAFT')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   
   // Variants
   const [variants, setVariants] = useState<Variant[]>([])
@@ -79,6 +80,19 @@ export function CreateProductModal({ open, onOpenChange, onSuccess }: Props) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [loadingStores, setLoadingStores] = useState(false)
+  
+  const addImageUrl = () => {
+    const input = document.getElementById('imageUrlInput') as HTMLInputElement
+    const url = input?.value?.trim()
+    if (url) {
+      setImageUrls([...imageUrls, url])
+      input.value = ''
+    }
+  }
+  
+  const removeImageUrl = (index: number) => {
+    setImageUrls(imageUrls.filter((_, i) => i !== index))
+  }
   
   const generateSKU = () => {
     const sku = title
@@ -135,6 +149,7 @@ export function CreateProductModal({ open, onOpenChange, onSuccess }: Props) {
           category: category || null,
           tags: tags.split(',').map(t => t.trim()).filter(Boolean),
           status: productStatus,
+          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
           variants: variants.map(v => ({
             sku: v.sku,
             optionValues: v.optionValues,
@@ -254,6 +269,7 @@ export function CreateProductModal({ open, onOpenChange, onSuccess }: Props) {
     setTags('')
     setProductStatus('DRAFT')
     setVariants([])
+    setImageUrls([])
   }
   
   return (

@@ -16,6 +16,7 @@ import {
   Tag,
   Sparkles,
   FileText,
+  Image,
   X,
   Check
 } from 'lucide-react';
@@ -39,6 +40,14 @@ interface Props {
 }
 
 const ACTION_OPTIONS: ActionOption[] = [
+  {
+    id: 'add_images',
+    label: 'Add Images',
+    icon: Image,
+    description: 'Upload or add image URLs in bulk',
+    badge: 'Bulk',
+    color: 'from-indigo-500 to-purple-500'
+  },
   {
     id: 'apply_pricing',
     label: 'Apply Pricing Rule',
