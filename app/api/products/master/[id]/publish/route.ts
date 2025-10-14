@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
 import { publishToBigCommerce } from '@/lib/publishers/bigcommerce-publisher'
+import { publishToShopify } from '@/lib/publishers/shopify-publisher'
 
 /**
  * Publish master product to selected channels
@@ -39,13 +41,50 @@ export async function POST(
       try {
         console.log(`📤 Publishing to store ${storeId}...`)
         
-        // For now, we only support BigCommerce
-        // Later we'll add Shopify, Etsy, TikTok publishers
-        const result = await publishToBigCommerce(
-          params.id,
-          storeId,
-          session.user.id
-        )
+        // Get store to determine platform
+        const store = await db.storeConnection.findFirst({
+          where: {
+            id: storeId,
+            userId: session.user.id
+          }
+        })
+        
+        if (!store) {
+          errors.push({
+            storeId,
+            success: false,
+            error: 'Store not found'
+          })
+          continue
+        }
+        
+        // Call appropriate publisher based on platform
+        let result: any
+        switch (store.platform) {
+          case 'BIGCOMMERCE':
+            result = await publishToBigCommerce(params.id, storeId, session.user.id)
+            break
+          case 'SHOPIFY':
+            result = await publishToShopify(params.id, storeId, session.user.id)
+            break
+          case 'ETSY':
+            result = {
+              success: false,
+              error: 'Etsy publisher not yet implemented (coming soon)'
+            }
+            break
+          case 'TIKTOK':
+            result = {
+              success: false,
+              error: 'TikTok publisher not yet implemented (coming soon)'
+            }
+            break
+          default:
+            result = {
+              success: false,
+              error: `Unsupported platform: ${store.platform}`
+            }
+        }
         
         if (result.success) {
           results.push({
