@@ -7,6 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Settings,
   Users,
   DollarSign,
@@ -15,7 +22,9 @@ import {
   Store,
   Package,
   BarChart3,
-  FileText
+  FileText,
+  Link as LinkIcon,
+  ExternalLink
 } from 'lucide-react'
 
 export default function AdminDashboardPage() {
@@ -23,6 +32,7 @@ export default function AdminDashboardPage() {
   const router = useRouter()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showLegacyLinksDialog, setShowLegacyLinksDialog] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -141,9 +151,20 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
-            <Badge variant="outline" className="border-orange-200 text-orange-600">
-              Admin Only
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLegacyLinksDialog(true)}
+                className="border-gray-300"
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                Legacy Links
+              </Button>
+              <Badge variant="outline" className="border-orange-200 text-orange-600">
+                Admin Only
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -265,6 +286,73 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Legacy Links Dialog */}
+      <Dialog open={showLegacyLinksDialog} onOpenChange={setShowLegacyLinksDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5" />
+              Legacy Features
+            </DialogTitle>
+            <DialogDescription>
+              Quick access to legacy import/export tools
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 hover:bg-orange-50 hover:border-orange-300 transition-colors"
+              onClick={() => {
+                router.push('/etsy-import')
+                setShowLegacyLinksDialog(false)
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <Package className="h-5 w-5 text-orange-600" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold">Etsy Import</div>
+                  <div className="text-xs text-muted-foreground">
+                    Legacy scraper-based import tool
+                  </div>
+                </div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto py-4 hover:bg-pink-50 hover:border-pink-300 transition-colors"
+              onClick={() => {
+                router.push('/tiktok-export')
+                setShowLegacyLinksDialog(false)
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-pink-100">
+                  <FileText className="h-5 w-5 text-pink-600" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold">TikTok Export</div>
+                  <div className="text-xs text-muted-foreground">
+                    Legacy Excel export tool
+                  </div>
+                </div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-900">
+              <strong>Note:</strong> These are legacy tools. New POD platform features are recommended for better performance and automation.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
