@@ -22,7 +22,8 @@ import {
   EyeOff,
   ArrowLeft,
   Shield,
-  CheckCircle2
+  CheckCircle2,
+  FlaskConical
 } from 'lucide-react'
 
 interface Setting {
@@ -542,7 +543,7 @@ export default function AdminSettingsPage() {
 
           {/* OAuth Settings */}
           <TabsContent value="oauth" className="space-y-4">
-            {['shopify', 'etsy', 'bigcommerce', 'tiktok'].map((platform) => {
+            {['shopify', 'etsy', 'bigcommerce'].map((platform) => {
               const isEtsy = platform === 'etsy'
               const clientIdLabel = isEtsy ? 'Keystring (API Key)' : 'Client ID'
               const clientIdPlaceholder = isEtsy ? 'Your Etsy API Key' : 'OAuth Client ID'
@@ -672,6 +673,176 @@ export default function AdminSettingsPage() {
                 </Card>
               )
             })}
+            
+            {/* TikTok Shop - Special Section with Environment Switcher */}
+            <Card className="border-pink-200">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      TikTok Shop OAuth
+                      <Badge variant="outline" className={
+                        getSetting('tiktok_environment') === 'production'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      }>
+                        <FlaskConical className="h-3 w-3 mr-1" />
+                        {getSetting('tiktok_environment') === 'production' ? 'Production' : 'Sandbox'}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Switch between sandbox (testing) and production environments
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Environment Toggle */}
+                <div className="space-y-2">
+                  <Label>Active Environment</Label>
+                  <div className="flex gap-3">
+                    <Button
+                      variant={getSetting('tiktok_environment') === 'sandbox' ? 'default' : 'outline'}
+                      className={`flex-1 ${getSetting('tiktok_environment') === 'sandbox' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
+                      onClick={() => updateSetting('tiktok_environment', 'sandbox')}
+                    >
+                      <FlaskConical className="h-4 w-4 mr-2" />
+                      Sandbox (Testing)
+                    </Button>
+                    <Button
+                      variant={getSetting('tiktok_environment') === 'production' ? 'default' : 'outline'}
+                      className={`flex-1 ${getSetting('tiktok_environment') === 'production' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                      onClick={() => updateSetting('tiktok_environment', 'production')}
+                    >
+                      <Store className="h-4 w-4 mr-2" />
+                      Production (Live)
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Switch instantly without restarting. System uses the active environment's credentials.
+                  </p>
+                </div>
+
+                {/* Sandbox Credentials */}
+                <div className="space-y-4 p-4 rounded-lg border-2 border-yellow-200 bg-yellow-50/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FlaskConical className="h-4 w-4 text-yellow-600" />
+                    <h4 className="font-semibold text-sm">Sandbox Credentials</h4>
+                    <Badge variant="outline" className="text-xs">For Testing</Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok_sandbox_client_id">Sandbox App Key (Client ID)</Label>
+                    <Input
+                      id="tiktok_sandbox_client_id"
+                      value={getSetting('tiktok_sandbox_client_id')}
+                      onChange={(e) => updateSetting('tiktok_sandbox_client_id', e.target.value)}
+                      placeholder="Your sandbox app key"
+                      className="font-mono bg-white"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok_sandbox_client_secret">Sandbox App Secret</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="tiktok_sandbox_client_secret"
+                        type={showSecrets['tiktok_sandbox_client_secret'] ? 'text' : 'password'}
+                        value={getSetting('tiktok_sandbox_client_secret')}
+                        onChange={(e) => updateSetting('tiktok_sandbox_client_secret', e.target.value)}
+                        placeholder="Sandbox app secret"
+                        className="font-mono bg-white"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleShowSecret('tiktok_sandbox_client_secret')}
+                      >
+                        {showSecrets['tiktok_sandbox_client_secret'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Production Credentials */}
+                <div className="space-y-4 p-4 rounded-lg border-2 border-green-200 bg-green-50/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Store className="h-4 w-4 text-green-600" />
+                    <h4 className="font-semibold text-sm">Production Credentials</h4>
+                    <Badge variant="outline" className="text-xs">Live Store</Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok_client_id">Production App Key (Client ID)</Label>
+                    <Input
+                      id="tiktok_client_id"
+                      value={getSetting('tiktok_client_id')}
+                      onChange={(e) => updateSetting('tiktok_client_id', e.target.value)}
+                      placeholder="Your production app key"
+                      className="font-mono bg-white"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok_client_secret">Production App Secret</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="tiktok_client_secret"
+                        type={showSecrets['tiktok_client_secret'] ? 'text' : 'password'}
+                        value={getSetting('tiktok_client_secret')}
+                        onChange={(e) => updateSetting('tiktok_client_secret', e.target.value)}
+                        placeholder="Production app secret"
+                        className="font-mono bg-white"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleShowSecret('tiktok_client_secret')}
+                      >
+                        {showSecrets['tiktok_client_secret'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Callback URL Info */}
+                <div className="space-y-2">
+                  <Label>Redirect URI (Register in TikTok Partner Center)</Label>
+                  <div className="rounded-md bg-blue-50 border border-blue-200 p-4">
+                    <div className="flex items-center gap-2 bg-white rounded p-2">
+                      <code className="text-xs font-mono flex-1">
+                        https://tekms.com/api/auth/callback/tiktok
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText('https://tekms.com/api/auth/callback/tiktok')
+                          toast({ title: "Copied callback URL!" })
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="text-xs text-blue-800 mt-2">
+                      Register this URL in TikTok Partner Center for BOTH sandbox and production apps
+                    </p>
+                  </div>
+                </div>
+
+                {/* Help Section */}
+                <div className="rounded-md bg-pink-50 border border-pink-200 p-3">
+                  <p className="text-xs text-pink-900">
+                    <strong>How It Works:</strong><br/>
+                    • Store both sandbox and production credentials<br/>
+                    • Switch environments anytime with one click<br/>
+                    • System automatically uses the active environment's credentials<br/>
+                    • No server restart needed when switching
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
             <Button
               onClick={() => handleSave('oauth')}

@@ -8,13 +8,20 @@ import crypto from 'crypto'
  * @param state - CSRF protection state token
  */
 export async function getTikTokAuthUrl(state: string): Promise<string> {
-  const clientKey = await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
+  // Get environment preference from database (defaults to 'sandbox')
+  const environment = await getSetting('tiktok_environment', 'sandbox')
+  const isSandbox = environment === 'sandbox'
+  
+  // Get credentials based on active environment
+  const clientKey = isSandbox
+    ? await getSetting('tiktok_sandbox_client_id', process.env.TIKTOK_CLIENT_KEY || '')
+    : await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
   
   if (!clientKey) {
-    throw new Error('TikTok Client ID not configured. Please configure in Admin > System Settings > OAuth.')
+    throw new Error(`TikTok ${environment} credentials not configured. Please configure in Admin > System Settings > OAuth.`)
   }
   
-  const redirectUri = (await getSetting('tiktok_redirect_uri', `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`)) || `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`
+  const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/callback/tiktok`
   
   const params = new URLSearchParams({
     app_key: clientKey,
@@ -22,7 +29,14 @@ export async function getTikTokAuthUrl(state: string): Promise<string> {
     redirect_uri: redirectUri,
   })
   
-  return `https://services.tiktokshop.com/open/authorize?${params.toString()}`
+  // Use sandbox URL for testing, production URL for live
+  const authBaseUrl = isSandbox
+    ? 'https://sandbox-services.tiktokshop.com/open/authorize'
+    : 'https://services.tiktokshop.com/open/authorize'
+  
+  console.log(`🎯 TikTok OAuth: Using ${environment} environment with app_key: ${clientKey.substring(0, 10)}...`)
+  
+  return `${authBaseUrl}?${params.toString()}`
 }
 
 /**
@@ -34,12 +48,24 @@ export async function handleTikTokCallback(
   code: string,
   userId: string
 ): Promise<{ success: boolean; storeName: string; storeId: string }> {
-  const clientKey = await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
-  const clientSecret = await getSetting('tiktok_client_secret', process.env.TIKTOK_CLIENT_SECRET || '')
+  // Get environment preference from database
+  const environment = await getSetting('tiktok_environment', 'sandbox')
+  const isSandbox = environment === 'sandbox'
+  
+  // Get credentials based on active environment
+  const clientKey = isSandbox
+    ? await getSetting('tiktok_sandbox_client_id', process.env.TIKTOK_CLIENT_KEY || '')
+    : await getSetting('tiktok_client_id', process.env.TIKTOK_CLIENT_KEY || '')
+    
+  const clientSecret = isSandbox
+    ? await getSetting('tiktok_sandbox_client_secret', process.env.TIKTOK_CLIENT_SECRET || '')
+    : await getSetting('tiktok_client_secret', process.env.TIKTOK_CLIENT_SECRET || '')
   
   if (!clientKey || !clientSecret) {
-    throw new Error('TikTok credentials not configured')
+    throw new Error(`TikTok ${environment} credentials not configured`)
   }
+  
+  console.log(`🎯 TikTok Callback: Using ${environment} environment`)
   
   // Generate signature for token exchange
   const timestamp = Math.floor(Date.now() / 1000)
@@ -49,8 +75,13 @@ export async function handleTikTokCallback(
     .update(signString)
     .digest('hex')
   
+  // Use appropriate token URL based on environment
+  const tokenUrl = isSandbox
+    ? 'https://sandbox-auth.tiktok-shops.com/api/v2/token/get'
+    : 'https://auth.tiktok-shops.com/api/v2/token/get'
+  
   // Exchange code for access token
-  const tokenResponse = await fetch('https://auth.tiktok-shops.com/api/v2/token/get', {
+  const tokenResponse = await fetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -74,8 +105,13 @@ export async function handleTikTokCallback(
   
   const { access_token, refresh_token, access_token_expire_in } = tokenData.data
   
+  // Use sandbox API URL for testing
+  const apiBaseUrl = isSandbox
+    ? 'https://sandbox-open-api.tiktokglobalshop.com'
+    : 'https://open-api.tiktokglobalshop.com'
+  
   // Get shop information
-  const shopResponse = await fetch('https://open-api.tiktokglobalshop.com/api/shop/get_authorized_shop', {
+  const shopResponse = await fetch(`${apiBaseUrl}/api/shop/get_authorized_shop`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
