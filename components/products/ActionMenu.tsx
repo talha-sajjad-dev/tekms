@@ -95,14 +95,12 @@ export function ActionMenu({ open, onOpenChange, onSelect, title, description, s
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl">{title}</DialogTitle>
-          <DialogDescription>
-            {description}
-            {selectedCount && selectedCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {selectedCount} selected
-              </Badge>
-            )}
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
+          {selectedCount && selectedCount > 0 && (
+            <Badge variant="secondary" className="mt-2">
+              {selectedCount} selected
+            </Badge>
+          )}
         </DialogHeader>
 
         <div className="grid gap-3 py-4">

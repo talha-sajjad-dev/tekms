@@ -613,12 +613,13 @@ export default function ProductsPage() {
                 stores.map(store => (
                   <div
                     key={store.id}
-                    className={`group flex items-center gap-2 p-2 rounded-lg border hover:bg-accent/50 transition-all ${
-                      selectedStoreIds.includes(store.id) ? 'bg-accent border-primary' : 'bg-card'
+                    className={`p-3 rounded-lg border transition-all ${
+                      selectedStoreIds.includes(store.id) ? 'bg-accent border-primary' : 'bg-card hover:border-primary/30'
                     }`}
                   >
+                    {/* Store Info - Clickable for filter */}
                     <div
-                      className="flex-1 flex items-center gap-2 cursor-pointer"
+                      className="flex items-center gap-2 mb-2 cursor-pointer"
                       onClick={() => {
                         setSelectedStoreIds(prev =>
                           prev.includes(store.id) ? prev.filter(id => id !== store.id) : [...prev, store.id]
@@ -626,37 +627,37 @@ export default function ProductsPage() {
                       }}
                     >
                       <div className={`w-2 h-2 rounded-full ${getPlatformColor(store.platform)}`} />
-                      <span className="text-sm flex-1 truncate">{store.storeName}</span>
-                      <span className="text-xs text-muted-foreground">{store.productCount}</span>
+                      <span className="text-sm font-medium flex-1 truncate">{store.storeName}</span>
+                      <span className="text-xs text-muted-foreground font-semibold">{store.productCount}</span>
                     </div>
                     
-                    {/* Hover Action Buttons */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Action Buttons - Always Visible */}
+                    <div className="flex items-center gap-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-6 px-2 text-xs"
+                        className="h-7 flex-1 text-xs"
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedStoreForAction(store.id)
                           setShowStoreActionMenu(true)
                         }}
-                        title="Edit store products"
                       >
+                        <Edit className="h-3 w-3 mr-1" />
                         Edit
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-6 px-2"
+                        className="h-7 flex-1 text-xs"
                         onClick={(e) => {
                           e.stopPropagation()
                           handlePreviewSync(store.id)
                         }}
                         disabled={syncing}
-                        title="Sync store"
                       >
-                        <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                        Sync
                       </Button>
                     </div>
                   </div>
@@ -1021,8 +1022,14 @@ export default function ProductsPage() {
       {selectedProducts.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm border rounded-full shadow-2xl px-4 py-2 flex items-center gap-3 z-50">
           <Badge variant="secondary">{selectedProducts.size} selected</Badge>
-          <Button size="sm" variant="outline" onClick={() => setShowPriceDialog(true)}>Bulk Edit</Button>
-          <Button size="sm" variant="outline" onClick={() => setShowTagDialog(true)}>Tags</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowActionMenu(true)}
+            className="border-primary/50 hover:bg-primary/5"
+          >
+            {selectedProducts.size === 1 ? 'Edit' : 'Bulk Edit'}
+          </Button>
           <Button size="sm" variant="outline" onClick={handleExportCSV}>Export</Button>
           <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}>Delete</Button>
           <Button size="sm" variant="ghost" onClick={() => setSelectedProducts(new Set())}>
