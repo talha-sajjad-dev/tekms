@@ -462,152 +462,6 @@ async function syncEtsyProducts(store: any, accessToken: string, jobId: string):
     throw error
   }
 }
-/**
- * Enrich BigCommerce products with detailed data
- * Fetches variants, modifiers, options, and full image data
- */
-async function enrichBigCommerceProducts(
-  products: any[],
-  storeHash: string,
-  accessToken: string
-): Promise<any[]> {
-  const enriched: any[] = []
-  
-  console.log(`🔍 Enriching ${products.length} products with detailed data...`)
-  
-  for (const product of products) {
-    try {
-      const productId = product.id
-      
-      // Fetch detailed product variants (if product has variants)
-      let enrichedVariants = product.variants || []
-      if (product.variants && product.variants.length > 0) {
-        try {
-          const variantsResponse = await rateLimitedFetch(
-            `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants`,
-            {
-              headers: {
-                'X-Auth-Token': accessToken,
-                'Accept': 'application/json',
-              }
-            }
-          )
-          
-          if (variantsResponse.ok) {
-            const variantsData = await variantsResponse.json()
-            enrichedVariants = variantsData.data || product.variants
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to fetch variants for product ${productId}:`, error)
-        }
-      }
-      
-      // Fetch product modifiers (text fields, checkboxes, etc.)
-      let enrichedModifiers: any[] = []
-      try {
-        const modifiersResponse = await rateLimitedFetch(
-          `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/modifiers`,
-          {
-            headers: {
-              'X-Auth-Token': accessToken,
-              'Accept': 'application/json',
-            }
-          }
-        )
-        
-        if (modifiersResponse.ok) {
-          const modifiersData = await modifiersResponse.json()
-          enrichedModifiers = modifiersData.data || []
-        }
-      } catch (error) {
-        console.warn(`⚠️ Failed to fetch modifiers for product ${productId}:`, error)
-      }
-      
-      // Fetch product options (color, size, etc.)
-      let enrichedOptions: any[] = []
-      try {
-        const optionsResponse = await rateLimitedFetch(
-          `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/options`,
-          {
-            headers: {
-              'X-Auth-Token': accessToken,
-              'Accept': 'application/json',
-            }
-          }
-        )
-        
-        if (optionsResponse.ok) {
-          const optionsData = await optionsResponse.json()
-          enrichedOptions = optionsData.data || []
-        }
-      } catch (error) {
-        console.warn(`⚠️ Failed to fetch options for product ${productId}:`, error)
-      }
-      
-      // Fetch all product images with full metadata
-      let enrichedImages = product.images || []
-      try {
-        const imagesResponse = await rateLimitedFetch(
-          `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/images`,
-          {
-            headers: {
-              'X-Auth-Token': accessToken,
-              'Accept': 'application/json',
-            }
-          }
-        )
-        
-        if (imagesResponse.ok) {
-          const imagesData = await imagesResponse.json()
-          enrichedImages = imagesData.data || product.images
-        }
-      } catch (error) {
-        console.warn(`⚠️ Failed to fetch images for product ${productId}:`, error)
-      }
-      
-      // Fetch brand information if brand_id exists
-      let brandName = null
-      if (product.brand_id && product.brand_id > 0) {
-        try {
-          const brandResponse = await rateLimitedFetch(
-            `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/brands/${product.brand_id}`,
-            {
-              headers: {
-                'X-Auth-Token': accessToken,
-                'Accept': 'application/json',
-              }
-            }
-          )
-          
-          if (brandResponse.ok) {
-            const brandData = await brandResponse.json()
-            brandName = brandData.data?.name || null
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to fetch brand for product ${productId}:`, error)
-        }
-      }
-      
-      enriched.push({
-        ...product,
-        enrichedVariants,
-        enrichedModifiers,
-        enrichedOptions,
-        enrichedImages,
-        brand_name: brandName
-      })
-      
-    } catch (error) {
-      console.error(`❌ Failed to enrich product ${product.id}:`, error)
-      // Still include the product with basic data
-      enriched.push(product)
-    }
-  }
-  
-  console.log(`✅ Enriched ${enriched.length} products with detailed data`)
-  return enriched
-}
-
 
 async function syncBigCommerceProducts(store: any, accessToken: string, jobId: string): Promise<number> {
   try {
@@ -619,13 +473,12 @@ async function syncBigCommerceProducts(store: any, accessToken: string, jobId: s
     console.log(`🔄 Starting BigCommerce product sync for store: ${store.storeName}`)
     
     // Fetch all products with pagination and rate limiting
-    // Include ALL necessary data: images, variants, modifiers, custom_fields, bulk_pricing_rules
     while (hasMorePages) {
       console.log(`📦 Fetching products page ${page}...`)
       logRateLimitStatus()
       
       const response = await rateLimitedFetch(
-        `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=250&page=${page}&include=images,variants,custom_fields,bulk_pricing_rules,primary_image,modifiers,options`,
+        `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=250&page=${page}&include=images`,
         {
           headers: {
             'X-Auth-Token': accessToken,
@@ -659,10 +512,6 @@ async function syncBigCommerceProducts(store: any, accessToken: string, jobId: s
       }
     }).catch(() => {}) // Ignore if job doesn't exist
     
-    // Note: All detailed data already included via ?include= parameter in initial fetch
-    // No need for additional API calls - data is already enriched!
-    console.log(`📦 Processing ${allProducts.length} products with complete data...`)
-    
     // Process and save products to database in batches
     let syncedCount = 0
     let failedCount = 0
@@ -686,7 +535,6 @@ async function syncBigCommerceProducts(store: any, accessToken: string, jobId: s
             }
           })
           
-          // Build comprehensive product data with all details
           const productData = {
             userId: store.userId,
             platform: 'BIGCOMMERCE' as const,
@@ -697,33 +545,12 @@ async function syncBigCommerceProducts(store: any, accessToken: string, jobId: s
             description: bcProduct.description || null,
             sku: bcProduct.sku || null,
             price: bcProduct.price || 0,
-            compareAtPrice: bcProduct.retail_price || bcProduct.sale_price || null,
+            compareAtPrice: bcProduct.retail_price || null,
             categories: (bcProduct.categories || []).map((c: number) => c.toString()),
-            tags: bcProduct.search_keywords ? bcProduct.search_keywords.split(',').map((t: string) => t.trim()) : [],
-            images: bcProduct.images ? {
-              images: bcProduct.images,
-              primary_image: bcProduct.primary_image
-            } : undefined,
-            variants: bcProduct.variants ? {
-              variants: bcProduct.variants,
-              has_variants: (bcProduct.variants?.length || 0) > 0
-            } : undefined,
-            customFields: {
-              custom_fields: bcProduct.custom_fields || [],
-              modifiers: bcProduct.modifiers || [],
-              options: bcProduct.options || [],
-              brand_id: bcProduct.brand_id,
-              brand_name: bcProduct.brand?.name || null,
-              weight: bcProduct.weight,
-              width: bcProduct.width,
-              height: bcProduct.height,
-              depth: bcProduct.depth,
-              condition: bcProduct.condition,
-              type: bcProduct.type,
-              availability: bcProduct.availability,
-              inventory_level: bcProduct.inventory_level,
-              inventory_tracking: bcProduct.inventory_tracking
-            },
+            tags: [],
+            images: bcProduct.images ? { images: bcProduct.images } : undefined,
+            variants: bcProduct.variants ? { variants: bcProduct.variants } : undefined,
+            customFields: bcProduct.custom_fields ? { custom_fields: bcProduct.custom_fields } : undefined,
             platformData: bcProduct,
             lastSyncedAt: new Date(),
             syncStatus: 'synced'
