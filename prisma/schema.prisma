@@ -690,7 +690,7 @@ model MasterProduct {
 model ChannelListing {
   id                String   @id @default(cuid())
   userId            String   // Denormalized for queries
-  masterProductId   String
+  masterProductId   String?  // Optional for now, will link to MasterProduct later
   storeConnectionId String
   platform          Platform
   externalId        String?  // ID on the platform (null until published)
@@ -712,9 +712,9 @@ model ChannelListing {
   lastPulledAt       DateTime?
   
   // Relations
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  masterProduct     MasterProduct   @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
-  storeConnection   StoreConnection @relation(fields: [storeConnectionId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  masterProduct     MasterProduct?   @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+  storeConnection   StoreConnection  @relation(fields: [storeConnectionId], references: [id], onDelete: Cascade)
   channelVariants   ChannelVariant[]
   legacyProducts    Product[]        // Backward compatibility
   

@@ -90,9 +90,10 @@ export default function AdminStoresPage() {
     return colors[platform] || 'bg-gray-100 text-gray-800'
   }
 
-  const totalRevenue = stores.reduce((sum, store) => 
-    sum + Number(store.storeSubscription?.pricingTier?.monthlyPrice || 0), 0
-  )
+  const totalRevenue = stores.reduce((sum, store) => {
+    const price = store.storeSubscription?.pricingTier?.monthlyPrice
+    return sum + (price ? Number(price) : 0)
+  }, 0)
 
   if (loading || status === 'loading') {
     return (
@@ -241,7 +242,9 @@ export default function AdminStoresPage() {
                       )}
                     </TableCell>
                     <TableCell className="font-medium">
-                      ${store.storeSubscription?.pricingTier?.monthlyPrice.toFixed(2) || '0.00'}
+                      ${store.storeSubscription?.pricingTier?.monthlyPrice
+                        ? Number(store.storeSubscription.pricingTier.monthlyPrice).toFixed(2)
+                        : '0.00'}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {store.lastSyncedAt 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Copy, Package, Info } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Package, Info, Palette } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,11 +86,25 @@ export default function TemplatesPage() {
     isActive: true,
   });
 
-  // Variant options state (e.g., { "Size": ["S", "M", "L"], "Color": ["Black", "White"] })
+  // Variant options state with color swatches
   const [variantOptions, setVariantOptions] = useState<Record<string, string[]>>({
     Size: ['S', 'M', 'L', 'XL'],
     Color: ['Black', 'White'],
   });
+
+  // Color swatches (hex codes) for Color options
+  const [colorSwatches, setColorSwatches] = useState<Record<string, string>>({
+    'Black': '#000000',
+    'White': '#FFFFFF',
+  });
+
+  // Predefined size options
+  const PRESET_SIZES = {
+    'Standard': ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    'Plus Size': ['1X', '2X', '3X', '4X', '5X'],
+    'Numeric': ['2', '4', '6', '8', '10', '12', '14', '16'],
+    'Youth': ['YS', 'YM', 'YL', 'YXL'],
+  };
 
   // Price by size state (e.g., { "S": 0, "M": 2, "L": 4, "XL": 6 })
   const [priceBySize, setPriceBySize] = useState<Record<string, number>>({
@@ -266,6 +280,22 @@ export default function TemplatesPage() {
     setVariantOptions(template.variantOptions);
     setPriceBySize(template.priceBySize || {});
     setTags(template.defaultTags);
+    
+    // Extract color swatches from variant options if they exist
+    if (template.variantOptions.Color) {
+      const swatches: Record<string, string> = {};
+      template.variantOptions.Color.forEach((color: string) => {
+        // Check if color has hex code (format: "ColorName|#hex")
+        if (color.includes('|')) {
+          const [name, hex] = color.split('|');
+          swatches[name] = hex;
+        }
+      });
+      if (Object.keys(swatches).length > 0) {
+        setColorSwatches(swatches);
+      }
+    }
+    
     setShowEditDialog(true);
   };
 
@@ -287,6 +317,10 @@ export default function TemplatesPage() {
       Size: ['S', 'M', 'L', 'XL'],
       Color: ['Black', 'White'],
     });
+    setColorSwatches({
+      'Black': '#000000',
+      'White': '#FFFFFF',
+    });
     setPriceBySize({
       S: 0,
       M: 2,
@@ -297,13 +331,51 @@ export default function TemplatesPage() {
     setTagInput('');
   };
 
-  const addVariantOption = (optionName: string, value: string) => {
+  const addVariantOption = (optionName: string, value: string, hexColor?: string) => {
     if (!optionName || !value) return;
+    
+    // Validate max 20 characters
+    if (value.length > 20) {
+      toast({
+        title: 'Error',
+        description: 'Option value cannot exceed 20 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Check if value already exists
+    if (variantOptions[optionName]?.includes(value)) {
+      toast({
+        title: 'Error',
+        description: 'This value already exists',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     setVariantOptions(prev => ({
       ...prev,
       [optionName]: [...(prev[optionName] || []), value],
     }));
+
+    // If it's a color option and hex color is provided, save the swatch
+    if (optionName === 'Color' && hexColor) {
+      setColorSwatches(prev => ({
+        ...prev,
+        [value]: hexColor,
+      }));
+    }
+  };
+
+  const addPresetSizes = (preset: string) => {
+    const sizes = PRESET_SIZES[preset as keyof typeof PRESET_SIZES];
+    if (sizes) {
+      setVariantOptions(prev => ({
+        ...prev,
+        Size: [...new Set([...(prev.Size || []), ...sizes])], // Avoid duplicates
+      }));
+    }
   };
 
   const removeVariantOption = (optionName: string, value: string) => {
@@ -311,6 +383,13 @@ export default function TemplatesPage() {
       ...prev,
       [optionName]: prev[optionName].filter(v => v !== value),
     }));
+    
+    // Remove color swatch if it's a color option
+    if (optionName === 'Color' && colorSwatches[value]) {
+      const newSwatches = { ...colorSwatches };
+      delete newSwatches[value];
+      setColorSwatches(newSwatches);
+    }
   };
 
   const removeOptionCategory = (optionName: string) => {
@@ -552,14 +631,22 @@ export default function TemplatesPage() {
             <div className="space-y-4">
               <h3 className="font-semibold">Variant Options *</h3>
               <p className="text-sm text-muted-foreground">
-                Define the options available for this product (e.g., Size, Color)
+                Define the options available for this product (max 20 characters per value)
               </p>
 
               {Object.entries(variantOptions).map(([optionName, values]) => (
                 <Card key={optionName}>
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-center">
-                      <CardTitle className="text-sm">{optionName}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm">{optionName}</CardTitle>
+                        {optionName === 'Color' && (
+                          <Badge variant="outline" className="text-xs">
+                            <Palette className="h-3 w-3 mr-1" />
+                            With Swatches
+                          </Badge>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -570,10 +657,36 @@ export default function TemplatesPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-wrap gap-2 mb-2">
+                    {/* Preset Sizes for Size Option */}
+                    {optionName === 'Size' && (
+                      <div className="mb-3">
+                        <Label className="text-xs text-muted-foreground mb-2 block">Quick Add Presets:</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.keys(PRESET_SIZES).map(preset => (
+                            <Button
+                              key={preset}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addPresetSizes(preset)}
+                              className="text-xs"
+                            >
+                              + {preset}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 mb-3">
                       {values.map(value => (
-                        <Badge key={value} variant="secondary">
-                          {value}
+                        <Badge key={value} variant="secondary" className="flex items-center gap-1">
+                          {optionName === 'Color' && colorSwatches[value] && (
+                            <div
+                              className="w-3 h-3 rounded-full border border-gray-300"
+                              style={{ backgroundColor: colorSwatches[value] }}
+                            />
+                          )}
+                          <span className="max-w-[150px] truncate" title={value}>{value}</span>
                           <button
                             onClick={() => removeVariantOption(optionName, value)}
                             className="ml-1 hover:text-destructive"
@@ -583,20 +696,95 @@ export default function TemplatesPage() {
                         </Badge>
                       ))}
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder={`Add ${optionName} value`}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const value = e.currentTarget.value;
+
+                    {/* Add Color with Swatch */}
+                    {optionName === 'Color' ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Input
+                              id={`color-name-${optionName}`}
+                              placeholder="Color name (max 20 chars)"
+                              maxLength={20}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Characters: <span id={`char-count-${optionName}`}>0</span>/20
+                            </p>
+                          </div>
+                          <div className="w-24">
+                            <Input
+                              id={`color-hex-${optionName}`}
+                              type="color"
+                              defaultValue="#000000"
+                              className="h-10 cursor-pointer"
+                              title="Choose color swatch"
+                            />
+                            <Label className="text-xs text-muted-foreground">Swatch</Label>
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              const nameInput = document.getElementById(`color-name-${optionName}`) as HTMLInputElement;
+                              const hexInput = document.getElementById(`color-hex-${optionName}`) as HTMLInputElement;
+                              const name = nameInput?.value.trim();
+                              const hex = hexInput?.value;
+                              if (name) {
+                                addVariantOption(optionName, name, hex);
+                                nameInput.value = '';
+                                hexInput.value = '#000000';
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Input
+                            id={`option-input-${optionName}`}
+                            placeholder={`Add ${optionName} value (max 20 chars)`}
+                            maxLength={20}
+                            onChange={(e) => {
+                              const charCount = document.getElementById(`char-count-opt-${optionName}`);
+                              if (charCount) {
+                                charCount.textContent = e.target.value.length.toString();
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const value = e.currentTarget.value.trim();
+                                if (value) {
+                                  addVariantOption(optionName, value);
+                                  e.currentTarget.value = '';
+                                  const charCount = document.getElementById(`char-count-opt-${optionName}`);
+                                  if (charCount) charCount.textContent = '0';
+                                }
+                              }
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Characters: <span id={`char-count-opt-${optionName}`}>0</span>/20
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const input = document.getElementById(`option-input-${optionName}`) as HTMLInputElement;
+                            const value = input?.value.trim();
                             if (value) {
                               addVariantOption(optionName, value);
-                              e.currentTarget.value = '';
+                              input.value = '';
+                              const charCount = document.getElementById(`char-count-opt-${optionName}`);
+                              if (charCount) charCount.textContent = '0';
                             }
-                          }
-                        }}
-                      />
-                    </div>
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

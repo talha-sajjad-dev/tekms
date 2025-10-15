@@ -125,6 +125,21 @@ export async function PATCH(
           { status: 400 }
         );
       }
+      
+      // Validate option values don't exceed 20 characters
+      for (const [optionName, values] of Object.entries(variantOptions)) {
+        if (Array.isArray(values)) {
+          for (const value of values) {
+            if (typeof value === 'string' && value.length > 20) {
+              return NextResponse.json(
+                { error: `Option value "${value}" exceeds 20 character limit` },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      }
+      
       updateData.variantOptions = variantOptions;
     }
     if (designSlots !== undefined) updateData.designSlots = designSlots;
