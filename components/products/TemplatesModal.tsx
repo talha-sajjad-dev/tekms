@@ -69,15 +69,9 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
     isActive: true,
   });
 
-  const [variantOptions, setVariantOptions] = useState<Record<string, string[]>>({
-    Size: ['S', 'M', 'L', 'XL'],
-    Color: ['Black', 'White'],
-  });
+  const [variantOptions, setVariantOptions] = useState<Record<string, string[]>>({});
 
-  const [colorSwatches, setColorSwatches] = useState<Record<string, string>>({
-    'Black': '#000000',
-    'White': '#FFFFFF',
-  });
+  const [colorSwatches, setColorSwatches] = useState<Record<string, string>>({});
 
   const PRESET_SIZES = {
     'Standard': ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
@@ -206,14 +200,35 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
       basePrice: '',
       isActive: true,
     });
-    setVariantOptions({
-      Size: ['S', 'M', 'L', 'XL'],
-      Color: ['Black', 'White'],
-    });
-    setColorSwatches({
-      'Black': '#000000',
-      'White': '#FFFFFF',
-    });
+    setVariantOptions({});
+    setColorSwatches({});
+  };
+
+  const addNewVariationType = (typeName: string) => {
+    if (!typeName || variantOptions[typeName]) {
+      toast({
+        title: 'Error',
+        description: typeName ? 'This variation type already exists' : 'Please enter a variation type name',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setVariantOptions(prev => ({
+      ...prev,
+      [typeName]: [],
+    }));
+  };
+
+  const removeVariationType = (optionName: string) => {
+    const newOptions = { ...variantOptions };
+    delete newOptions[optionName];
+    setVariantOptions(newOptions);
+    
+    // Clean up color swatches if removing Color variation
+    if (optionName === 'Color') {
+      setColorSwatches({});
+    }
   };
 
   const addVariantOption = (optionName: string, value: string, hexColor?: string) => {
@@ -463,8 +478,41 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
             </div>
 
             <div>
-              <Label>Variant Options (max 20 chars per value)</Label>
-              <div className="space-y-2 mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <Label>Variant Options (max 20 chars per value)</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Add variation types separately (e.g., Size OR Color, not both)
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="newVariationType"
+                    placeholder="e.g., Size or Color"
+                    className="w-40 h-8 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const input = document.getElementById('newVariationType') as HTMLInputElement;
+                      const typeName = input?.value.trim();
+                      if (typeName) {
+                        addNewVariationType(typeName);
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    Add Type
+                  </Button>
+                </div>
+              </div>
+              {Object.keys(variantOptions).length === 0 && (
+                <div className="text-center py-6 text-sm text-muted-foreground border border-dashed rounded-lg mb-2">
+                  <p className="mb-2">No variation types added yet</p>
+                  <p className="text-xs">Click "Add Type" above to create Size, Color, or custom variations</p>
+                </div>
+              )}
+              <div className="space-y-2">
                 {Object.entries(variantOptions).map(([optionName, values]) => (
                   <Card key={optionName}>
                     <CardHeader className="pb-2">
@@ -478,6 +526,14 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
                             </Badge>
                           )}
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariationType(optionName)}
+                          title="Remove this variation type"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
