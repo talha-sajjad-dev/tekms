@@ -80,6 +80,29 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
     'Youth': ['YS', 'YM', 'YL', 'YXL'],
   };
 
+  // Predefined variation types for selection
+  const VARIATION_TYPES = [
+    'Size',
+    'Color',
+    'Material',
+    'Style',
+    'Fit',
+    'Length',
+    'Neckline',
+    'Sleeve Length',
+    'Pattern',
+    'Finish',
+    'Thickness',
+    'Weight',
+    'Design',
+    'Theme',
+    'Occasion',
+    'Season',
+    'Gender',
+    'Age Group',
+    'Custom',
+  ] as const;
+
   useEffect(() => {
     if (open) {
       fetchTemplates();
@@ -478,33 +501,48 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="space-y-3">
                 <div>
-                  <Label>Variant Options (max 20 chars per value)</Label>
+                  <Label>Variation Types</Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Add variation types separately (e.g., Size OR Color, not both)
+                    Select variation types for your template (e.g., Size, Color, Material)
                   </p>
                 </div>
+
                 <div className="flex gap-2">
-                  <Input
-                    id="newVariationType"
-                    placeholder="e.g., Size or Color"
-                    className="w-40 h-8 text-xs"
-                  />
+                  <Select onValueChange={(value) => {
+                    if (value && !variantOptions[value]) {
+                      addNewVariationType(value);
+                    }
+                  }}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select variation type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VARIATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => {
-                      const input = document.getElementById('newVariationType') as HTMLInputElement;
-                      const typeName = input?.value.trim();
-                      if (typeName) {
-                        addNewVariationType(typeName);
-                        input.value = '';
+                      // Allow custom option name if needed
+                      const customName = prompt('Enter custom variation type name:');
+                      if (customName && !variantOptions[customName]) {
+                        addNewVariationType(customName);
                       }
                     }}
                   >
-                    Add Type
+                    Custom
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Select from common variation types above, or use "Custom" for unique options
+                </p>
               </div>
               {Object.keys(variantOptions).length === 0 && (
                 <div className="text-center py-6 text-sm text-muted-foreground border border-dashed rounded-lg mb-2">
