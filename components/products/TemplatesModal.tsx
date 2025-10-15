@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Copy, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Package, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +73,18 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
     Size: ['S', 'M', 'L', 'XL'],
     Color: ['Black', 'White'],
   });
+
+  const [colorSwatches, setColorSwatches] = useState<Record<string, string>>({
+    'Black': '#000000',
+    'White': '#FFFFFF',
+  });
+
+  const PRESET_SIZES = {
+    'Standard': ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    'Plus Size': ['1X', '2X', '3X', '4X', '5X'],
+    'Numeric': ['2', '4', '6', '8', '10', '12', '14', '16'],
+    'Youth': ['YS', 'YM', 'YL', 'YXL'],
+  };
 
   useEffect(() => {
     if (open) {
@@ -198,14 +210,54 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
       Size: ['S', 'M', 'L', 'XL'],
       Color: ['Black', 'White'],
     });
+    setColorSwatches({
+      'Black': '#000000',
+      'White': '#FFFFFF',
+    });
   };
 
-  const addVariantOption = (optionName: string, value: string) => {
+  const addVariantOption = (optionName: string, value: string, hexColor?: string) => {
     if (!optionName || !value) return;
+    
+    if (value.length > 20) {
+      toast({
+        title: 'Error',
+        description: 'Option value cannot exceed 20 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (variantOptions[optionName]?.includes(value)) {
+      toast({
+        title: 'Error',
+        description: 'This value already exists',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setVariantOptions(prev => ({
       ...prev,
       [optionName]: [...(prev[optionName] || []), value],
     }));
+
+    if (optionName === 'Color' && hexColor) {
+      setColorSwatches(prev => ({
+        ...prev,
+        [value]: hexColor,
+      }));
+    }
+  };
+
+  const addPresetSizes = (preset: string) => {
+    const sizes = PRESET_SIZES[preset as keyof typeof PRESET_SIZES];
+    if (sizes) {
+      setVariantOptions(prev => ({
+        ...prev,
+        Size: [...new Set([...(prev.Size || []), ...sizes])],
+      }));
+    }
   };
 
   const removeVariantOption = (optionName: string, value: string) => {
@@ -213,6 +265,12 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
       ...prev,
       [optionName]: prev[optionName].filter(v => v !== value),
     }));
+    
+    if (optionName === 'Color' && colorSwatches[value]) {
+      const newSwatches = { ...colorSwatches };
+      delete newSwatches[value];
+      setColorSwatches(newSwatches);
+    }
   };
 
   return (
@@ -405,18 +463,53 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
             </div>
 
             <div>
-              <Label>Variant Options</Label>
+              <Label>Variant Options (max 20 chars per value)</Label>
               <div className="space-y-2 mt-2">
                 {Object.entries(variantOptions).map(([optionName, values]) => (
                   <Card key={optionName}>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">{optionName}</CardTitle>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-sm">{optionName}</CardTitle>
+                          {optionName === 'Color' && (
+                            <Badge variant="outline" className="text-xs">
+                              <Palette className="h-3 w-3 mr-1" />
+                              With Swatches
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-2">
+                      {optionName === 'Size' && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Quick Add:</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Object.keys(PRESET_SIZES).map(preset => (
+                              <Button
+                                key={preset}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addPresetSizes(preset)}
+                                className="text-xs h-6"
+                              >
+                                + {preset}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="flex flex-wrap gap-1">
                         {values.map(value => (
-                          <Badge key={value} variant="secondary">
-                            {value}
+                          <Badge key={value} variant="secondary" className="flex items-center gap-1">
+                            {optionName === 'Color' && colorSwatches[value] && (
+                              <div
+                                className="w-3 h-3 rounded-full border"
+                                style={{ backgroundColor: colorSwatches[value] }}
+                              />
+                            )}
+                            <span className="max-w-[100px] truncate" title={value}>{value}</span>
                             <button
                               onClick={() => removeVariantOption(optionName, value)}
                               className="ml-1 hover:text-destructive"
@@ -426,6 +519,72 @@ export function TemplatesModal({ open, onOpenChange, onSelectTemplate }: Props) 
                           </Badge>
                         ))}
                       </div>
+
+                      {optionName === 'Color' ? (
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Input
+                              id={`color-name-${optionName}`}
+                              placeholder="Color name (max 20 chars)"
+                              maxLength={20}
+                            />
+                          </div>
+                          <div className="w-20">
+                            <Input
+                              id={`color-hex-${optionName}`}
+                              type="color"
+                              defaultValue="#000000"
+                              className="h-9 cursor-pointer"
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const nameInput = document.getElementById(`color-name-${optionName}`) as HTMLInputElement;
+                              const hexInput = document.getElementById(`color-hex-${optionName}`) as HTMLInputElement;
+                              const name = nameInput?.value.trim();
+                              const hex = hexInput?.value;
+                              if (name) {
+                                addVariantOption(optionName, name, hex);
+                                nameInput.value = '';
+                                hexInput.value = '#000000';
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            id={`option-input-${optionName}`}
+                            placeholder={`Add ${optionName} (max 20 chars)`}
+                            maxLength={20}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const value = e.currentTarget.value.trim();
+                                if (value) {
+                                  addVariantOption(optionName, value);
+                                  e.currentTarget.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const input = document.getElementById(`option-input-${optionName}`) as HTMLInputElement;
+                              const value = input?.value.trim();
+                              if (value) {
+                                addVariantOption(optionName, value);
+                                input.value = '';
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

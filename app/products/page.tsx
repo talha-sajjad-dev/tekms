@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import { BulkPriceDialog } from '@/components/products/BulkPriceDialog'
 import { BulkTagDialog } from '@/components/products/BulkTagDialog'
 import { SyncProgressDialog } from '@/components/products/SyncProgressDialog'
+import { Loader2, XCircle } from 'lucide-react'
 import { CreateProductModal } from '@/components/products/CreateProductModal'
 import { PricingRulesModal } from '@/components/products/PricingRulesModal'
 import { TemplatesModal } from '@/components/products/TemplatesModal'
@@ -85,7 +86,21 @@ interface StoreConnection {
   storeName: string
   productCount: number
   syncStatus: string | null
+  syncError: string | null
   lastSyncedAt: string | null
+}
+
+interface SyncJobStatus {
+  hasActiveJob: boolean
+  isStuck?: boolean
+  job?: {
+    id: string
+    status: string
+    totalItems: number
+    processedItems: number
+    startedAt: string
+    platform: string
+  }
 }
 
 interface SavedFilter {
@@ -107,6 +122,8 @@ export default function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
+  const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncJobStatus>>({})
+  const [clearingSync, setClearingSync] = useState<string | null>(null)
   
   // Dialogs
   const [showPriceDialog, setShowPriceDialog] = useState(false)
@@ -310,6 +327,57 @@ export default function ProductsPage() {
       setShowSyncDialog(true)
     }
   }
+  
+  const checkSyncStatus = async (storeId: string) => {
+    try {
+      const res = await fetch(`/api/stores/${storeId}/sync/cancel`)
+      const data = await res.json()
+      
+      if (res.ok) {
+        setSyncStatuses(prev => ({
+          ...prev,
+          [storeId]: data
+        }))
+      }
+    } catch (error) {
+      console.error('Failed to check sync status:', error)
+    }
+  }
+
+  const handleClearSync = async (storeId: string) => {
+    setClearingSync(storeId)
+    try {
+      const res = await fetch(`/api/stores/${storeId}/sync/cancel`, {
+        method: 'POST'
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        toast({
+          title: "Sync Cleared",
+          description: data.message || "Stuck sync job has been cleared",
+        })
+        await checkSyncStatus(storeId)
+        fetchStores()
+        fetchProducts()
+      } else {
+        toast({
+          title: "Failed to Clear",
+          description: data.error || "Failed to clear sync job",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clear sync job",
+        variant: "destructive",
+      })
+    } finally {
+      setClearingSync(null)
+    }
+  }
 
   const handlePreviewSync = async (storeId: string) => {
     const store = stores.find(s => s.id === storeId)
@@ -353,8 +421,16 @@ export default function ProductsPage() {
       })
     } finally {
       setSyncing(false)
+      await checkSyncStatus(storeId)
     }
   }
+  
+  // Check sync statuses when stores load
+  useEffect(() => {
+    if (stores.length > 0) {
+      stores.forEach(store => checkSyncStatus(store.id))
+    }
+  }, [stores.length])
   
   const handleProgressDialogClose = (open: boolean) => {
     setShowProgressDialog(open)
@@ -630,7 +706,25 @@ export default function ProductsPage() {
                       <span className="text-xs text-muted-foreground font-semibold">{store.productCount}</span>
                     </div>
                     
-                    {/* Action Buttons - Always Visible */}
+                    {/* Sync Status & Progress */}
+                    {syncStatuses[store.id]?.hasActiveJob && syncStatuses[store.id]?.job && (
+                      <div className="mb-2 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between">
+                          <span>Progress:</span>
+                          <span className="font-medium">
+                            {syncStatuses[store.id].job!.processedItems || 0} / {syncStatuses[store.id].job!.totalItems || '?'}
+                          </span>
+                        </div>
+                        {syncStatuses[store.id]?.isStuck && (
+                          <div className="text-orange-600 flex items-center gap-1 mt-1">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>Stuck (30+ min)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Action Buttons */}
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -645,19 +739,39 @@ export default function ProductsPage() {
                         <Edit className="h-3 w-3 mr-1" />
                         Edit
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 flex-1 text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePreviewSync(store.id)
-                        }}
-                        disabled={syncing}
-                      >
-                        <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? 'animate-spin' : ''}`} />
-                        Sync
-                      </Button>
+                      {syncStatuses[store.id]?.hasActiveJob ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 flex-1 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleClearSync(store.id)
+                          }}
+                          disabled={clearingSync === store.id}
+                        >
+                          {clearingSync === store.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <XCircle className="h-3 w-3 mr-1" />
+                          )}
+                          Clear
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 flex-1 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handlePreviewSync(store.id)
+                          }}
+                          disabled={syncing}
+                        >
+                          <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                          Sync
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))
