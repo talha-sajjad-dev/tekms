@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 
 /**
- * Cancel/Clear stuck sync job
+ * Cancel/Clear sync job (Enhanced with graceful cancellation)
  * POST /api/stores/[id]/sync/cancel
  */
 export async function POST(
@@ -20,6 +20,8 @@ export async function POST(
       )
     }
     
+    const { jobId, reason } = await req.json().catch(() => ({}))
+    
     const store = await db.storeConnection.findFirst({
       where: {
         id: params.id,
@@ -34,6 +36,47 @@ export async function POST(
       )
     }
     
+    if (jobId) {
+      // Cancel specific job
+      const job = await db.syncJob.findFirst({
+        where: {
+          id: jobId,
+          userId: session.user.id
+        }
+      })
+      
+      if (!job) {
+        return NextResponse.json(
+          { error: 'Job not found' },
+          { status: 404 }
+        )
+      }
+      
+      if (job.status !== 'processing') {
+        return NextResponse.json(
+          { error: 'Can only cancel processing jobs' },
+          { status: 400 }
+        )
+      }
+      
+      // Set cancel flag for graceful shutdown
+      await db.syncJob.update({
+        where: { id: jobId },
+        data: {
+          cancelRequested: true,
+          cancellationReason: reason || 'User cancelled'
+        }
+      })
+      
+      console.log(`🛑 Cancel requested for sync job ${jobId}`)
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Cancel requested. Job will stop at next checkpoint.',
+        jobId
+      })
+    }
+    
     // Find any processing sync jobs for this platform
     const stuckJobs = await db.syncJob.findMany({
       where: {
@@ -46,12 +89,12 @@ export async function POST(
     if (stuckJobs.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'No stuck sync jobs found',
+        message: 'No sync jobs found',
         clearedCount: 0
       })
     }
     
-    // Update all stuck jobs to cancelled
+    // Request cancellation for all stuck jobs
     const result = await db.syncJob.updateMany({
       where: {
         userId: session.user.id,
@@ -59,24 +102,23 @@ export async function POST(
         status: 'processing'
       },
       data: {
-        status: 'cancelled',
-        completedAt: new Date(),
-        errorLog: 'Manually cancelled by user'
+        cancelRequested: true,
+        cancellationReason: reason || 'User cancelled all jobs'
       }
     })
     
-    console.log(`🧹 Cleared ${result.count} stuck sync job(s) for ${store.platform}`)
+    console.log(`🧹 Requested cancellation for ${result.count} sync job(s) for ${store.platform}`)
     
     return NextResponse.json({
       success: true,
-      message: `Cleared ${result.count} stuck sync job(s)`,
+      message: `Cancellation requested for ${result.count} sync job(s)`,
       clearedCount: result.count
     })
     
   } catch (error) {
     console.error('Error cancelling sync job:', error)
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to cancel sync job',
         details: error instanceof Error ? error.message : 'Unknown error'
       },

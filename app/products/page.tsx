@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import { BulkPriceDialog } from '@/components/products/BulkPriceDialog'
 import { BulkTagDialog } from '@/components/products/BulkTagDialog'
 import { SyncProgressDialog } from '@/components/products/SyncProgressDialog'
+import { EnhancedSyncProgressDialog } from '@/components/products/EnhancedSyncProgressDialog'
 import { Loader2, XCircle } from 'lucide-react'
 import { CreateProductModal } from '@/components/products/CreateProductModal'
 import { PricingRulesModal } from '@/components/products/PricingRulesModal'
@@ -131,8 +132,10 @@ export default function ProductsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showSyncDialog, setShowSyncDialog] = useState(false)
   const [showProgressDialog, setShowProgressDialog] = useState(false)
+  const [showFullSyncDialog, setShowFullSyncDialog] = useState(false)
   const [syncingStoreId, setSyncingStoreId] = useState<string>('')
   const [syncingStoreName, setSyncingStoreName] = useState<string>('')
+  const [syncingJobId, setSyncingJobId] = useState<string>('')
   const [bulkOperating, setBulkOperating] = useState(false)
   const [syncing, setSyncing] = useState(false)
   
@@ -379,19 +382,21 @@ export default function ProductsPage() {
     }
   }
 
-  const handlePreviewSync = async (storeId: string) => {
+  const handlePreviewSync = async (storeId: string, fullSync = false) => {
     const store = stores.find(s => s.id === storeId)
     if (!store) return
     
-    console.log('🔄 Starting background sync for:', store.storeName)
+    const syncType = fullSync ? 'full sync' : 'sync'
+    console.log(`🔄 Starting ${syncType} for:`, store.storeName)
     setShowSyncDialog(false)
     setSyncing(true)
     setSyncingStoreId(storeId)
     setSyncingStoreName(store.storeName)
     
     try {
-      // Start background sync
-      const res = await fetch(`/api/stores/${storeId}/sync`, {
+      // Start background sync (full or regular)
+      const endpoint = fullSync ? `/api/stores/${storeId}/sync/full` : `/api/stores/${storeId}/sync`
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ background: true })
@@ -400,20 +405,26 @@ export default function ProductsPage() {
       const data = await res.json()
       
       if (res.ok) {
-        console.log('✅ Background sync started:', data.jobId)
-        // Show progress dialog
-        setShowProgressDialog(true)
+        console.log(`✅ ${syncType} started:`, data.jobId)
+        setSyncingJobId(data.jobId)
+        
+        // Show appropriate progress dialog
+        if (fullSync) {
+          setShowFullSyncDialog(true)
+        } else {
+          setShowProgressDialog(true)
+        }
       } else {
-        console.log('❌ Sync failed to start:', data.error)
+        console.log(`❌ ${syncType} failed to start:`, data.error)
         toast({
           title: 'Sync Failed',
-          description: data.error || 'Failed to start sync. Please try again.',
+          description: data.error || `Failed to start ${syncType}. Please try again.`,
           variant: 'destructive',
           duration: 7000
         })
       }
     } catch (error) {
-      console.error('❌ Sync error:', error)
+      console.error(`❌ ${syncType} error:`, error)
       toast({
         title: 'Error',
         description: 'Network error while starting sync. Please check your connection.',
@@ -1094,12 +1105,12 @@ export default function ProductsPage() {
                   className="w-full justify-start"
                   onClick={() => {
                     if (selectedProduct.storeConnection) {
-                      router.push(`/stores/${selectedProduct.storeConnection.id}/products/${selectedProduct.id}/edit`)
+                      router.push(`/stores/${selectedProduct.storeConnection.id}/products/${selectedProduct.id}/edit-advanced`)
                     }
                   }}
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  Advanced Edit
+                  Advanced Edit (Full Data)
                 </Button>
                 <Button
                   variant="outline"
@@ -1214,6 +1225,21 @@ export default function ProductsPage() {
         onOpenChange={handleProgressDialogClose}
         storeId={syncingStoreId}
         storeName={syncingStoreName}
+      />
+      
+      {/* Enhanced Full Sync Progress Dialog */}
+      <EnhancedSyncProgressDialog
+        open={showFullSyncDialog}
+        onOpenChange={(open) => {
+          setShowFullSyncDialog(open)
+          if (!open) {
+            fetchStores()
+            fetchProducts()
+          }
+        }}
+        storeId={syncingStoreId}
+        storeName={syncingStoreName}
+        jobId={syncingJobId}
       />
       
       {/* POD Feature Modals */}
