@@ -94,6 +94,21 @@ export async function createTikTokExcel(
     // Get headers from first row
     const headers = templateData[0] || []
     
+    // Swap header titles: AH ↔ AI and move Product Status from BC to BE
+    const tempHeaderAH = headers[33]
+    headers[33] = headers[34]
+    headers[34] = tempHeaderAH
+    
+    // Move "Product Status" header from BC to BE
+    if (headers[54]) {
+      headers[56] = headers[54]  // Move to BE
+      headers[54] = ''  // Clear BC
+      headers[55] = ''  // Clear BD
+    }
+    
+    // Update the header row in template
+    templateData[0] = headers
+    
     // Find column indices for fields we want to update
     const productNameCol = headers.findIndex(h =>
       h && h.toString().toLowerCase().includes('product') && h.toString().toLowerCase().includes('name')
@@ -102,14 +117,10 @@ export async function createTikTokExcel(
       h && h.toString().toLowerCase().includes('description')
     )
     
-    // Find new custom columns (BB, BD, BE)
-    const bbCol = headers.findIndex(h => h && h.toString().trim() === 'BB')
-    const bdCol = headers.findIndex(h => h && h.toString().trim() === 'BD')
-    const beCol = headers.findIndex(h => h && h.toString().trim() === 'BE')
-    
-    // Find price columns AH and AI for swapping
-    const ahCol = headers.findIndex(h => h && h.toString().trim() === 'AH')
-    const aiCol = headers.findIndex(h => h && h.toString().trim() === 'AI')
+    // Define column indices directly (Excel columns are 0-indexed)
+    const retailPriceCol = 33  // Column AH (34th column) - "Retail Price (Local Currency)"
+    const listPriceCol = 34    // Column AI (35th column) - "List price (Local currency)"
+    const productStatusCol = 54 // Column BC (55th column) - "Product Status"
     
     // Find image columns (look for columns containing "image" or "picture")
     const imageColumns: number[] = []
@@ -123,16 +134,6 @@ export async function createTikTokExcel(
       }
     })
     
-    console.log('Found columns:', {
-      productName: productNameCol,
-      description: descriptionCol,
-      images: imageColumns,
-      bb: bbCol,
-      bd: bdCol,
-      be: beCol,
-      ah: ahCol,
-      ai: aiCol
-    })
     
     // Start with template data (preserve all existing data)
     const newData = [...templateData]
@@ -169,27 +170,18 @@ export async function createTikTokExcel(
           newData[rowIndex][descriptionCol] = selectedProduct['Description'] || newData[rowIndex][descriptionCol] || ''
         }
         
-        // Update new custom columns
-        if (bbCol >= 0) {
-          newData[rowIndex][bbCol] = selectedProduct['BB'] || 'No' // Always "No"
-        }
+        // Swap data between columns AH (Retail Price) and AI (List Price)
+        const tempAH = newData[rowIndex][retailPriceCol]
+        const tempAI = newData[rowIndex][listPriceCol]
+        newData[rowIndex][retailPriceCol] = tempAI
+        newData[rowIndex][listPriceCol] = tempAH
         
-        if (bdCol >= 0) {
-          newData[rowIndex][bdCol] = selectedProduct['BD'] || selectedProduct['Status'] || '' // BC Product Status
-        }
-        
-        if (beCol >= 0) {
-          newData[rowIndex][beCol] = selectedProduct['BE'] || '' // Safety optional title (empty)
-        }
-        
-        // Swap AH and AI price columns
-        // AH retail price data should go in AI List price
-        // AI list price data should go in AH retail price
-        if (ahCol >= 0 && aiCol >= 0) {
-          const ahValue = newData[rowIndex][ahCol]
-          const aiValue = newData[rowIndex][aiCol]
-          newData[rowIndex][ahCol] = aiValue
-          newData[rowIndex][aiCol] = ahValue
+        // Move Product Status from BC (index 54) to BE (index 56), clear BC and BD
+        const statusData = newData[rowIndex][productStatusCol]
+        if (statusData !== undefined && statusData !== null && statusData !== '') {
+          newData[rowIndex][56] = statusData  // Move to BE (column 57, index 56)
+          newData[rowIndex][54] = ''  // Clear BC (column 55, index 54)
+          newData[rowIndex][55] = ''  // Clear BD (column 56, index 55)
         }
         
         // Update images - fill available image columns with product images
