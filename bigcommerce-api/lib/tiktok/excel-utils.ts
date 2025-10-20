@@ -163,6 +163,27 @@ export async function createTikTokExcel(
           }
           // If no BigCommerce image, keep existing template image
         })
+        
+        // Fix column swapping for AH (34) and AI (35) - swap data but keep headers
+        const ahIndex = 33 // Column AH (34th column, 0-indexed = 33)
+        const aiIndex = 34 // Column AI (35th column, 0-indexed = 34)
+        if (newData[rowIndex][ahIndex] !== undefined || newData[rowIndex][aiIndex] !== undefined) {
+          const tempAH = newData[rowIndex][ahIndex]
+          newData[rowIndex][ahIndex] = newData[rowIndex][aiIndex]
+          newData[rowIndex][aiIndex] = tempAH
+        }
+        
+        // Fix product status columns - BC (55), BD (56), BE (57)
+        const bcIndex = 54 // Column BC (55th column, 0-indexed = 54)
+        const bdIndex = 55 // Column BD (56th column, 0-indexed = 55)
+        const beIndex = 56 // Column BE (57th column, 0-indexed = 56)
+        
+        // Move product status to BE and clear BC, BD
+        if (selectedProduct['Status']) {
+          newData[rowIndex][beIndex] = selectedProduct['Status']
+          newData[rowIndex][bcIndex] = ''
+          newData[rowIndex][bdIndex] = ''
+        }
       }
     }
     
