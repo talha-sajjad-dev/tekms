@@ -176,6 +176,9 @@ export async function createTikTokExcel(
         newData[rowIndex][retailPriceCol] = tempAI
         newData[rowIndex][listPriceCol] = tempAH
         
+        // Set column BB (index 53) to "No" as default
+        newData[rowIndex][53] = 'No'
+        
         // Move Product Status from BC (index 54) to BE (index 56), clear BC and BD
         const statusData = newData[rowIndex][productStatusCol]
         if (statusData !== undefined && statusData !== null && statusData !== '') {
