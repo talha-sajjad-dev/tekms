@@ -135,14 +135,8 @@ export async function createTikTokExcel(
     })
     
     
-    // Start with template data (preserve all existing data)
-    const newData = [...templateData]
-    
-    // Use the first selected product to fill ALL 272 rows
-    const selectedProduct = products[0] // Take the first (and likely only) selected product
-    
-    if (!selectedProduct) {
-      console.log('No product selected, keeping template as-is')
+    if (!products || products.length === 0) {
+      console.log('No products selected, keeping template as-is')
       // Create new worksheet from unchanged template data
       const worksheet = XLSX.utils.aoa_to_sheet(templateData)
       const workbook = XLSX.utils.book_new()
@@ -154,54 +148,101 @@ export async function createTikTokExcel(
       })
     }
     
-    console.log(`Filling all 272 rows with data from: ${selectedProduct['Product Title']}`)
+    // Group products by base SKU (variants have same base SKU)
+    const productGroups: { [key: string]: any[] } = {}
+    products.forEach(product => {
+      const baseSKU = product.SKU?.split('-')[0] || product['Product Title']
+      if (!productGroups[baseSKU]) {
+        productGroups[baseSKU] = []
+      }
+      productGroups[baseSKU].push(product)
+    })
     
-    // Update ALL existing data rows (skip header row)
-    for (let rowIndex = 1; rowIndex < templateData.length; rowIndex++) {
-      // Only update rows that have existing data
-      if (newData[rowIndex] && newData[rowIndex].some((cell: any) => cell !== null && cell !== undefined && cell !== '')) {
+    const baseProductKeys = Object.keys(productGroups)
+    console.log(`Exporting ${baseProductKeys.length} base products with ${products.length} total variants`)
+    
+    // Start with header row
+    const finalData = [headers]
+    
+    // Get only the first 272 data rows from template (excluding header)
+    // Filter out any empty rows and take exactly 272 rows
+    const allTemplateRows = templateData.slice(1)
+    const nonEmptyRows = allTemplateRows.filter(row =>
+      row && row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')
+    )
+    const originalTemplateRows = nonEmptyRows.slice(0, 272)
+    
+    console.log(`Template has ${allTemplateRows.length} total rows, using ${originalTemplateRows.length} non-empty rows`)
+    
+    // For each base product, create a copy of 272 template rows
+    for (const baseKey of baseProductKeys) {
+      const variants = productGroups[baseKey]
+      console.log(`Processing ${baseKey} with ${variants.length} variants`)
+      
+      // Clone the 272 ORIGINAL template rows for this product (deep copy to avoid mutation)
+      const productRows = originalTemplateRows.map(row => [...row])
+      
+      // Fill the 272 rows with variants (cycling through them)
+      for (let rowIndex = 0; rowIndex < productRows.length; rowIndex++) {
+        const row = productRows[rowIndex]
         
-        // Update only specific fields, preserve all other data
-        if (productNameCol >= 0) {
-          newData[rowIndex][productNameCol] = selectedProduct['Product Title'] || newData[rowIndex][productNameCol] || ''
+        // Skip empty rows
+        if (!row || !row.some((cell: any) => cell !== null && cell !== undefined && cell !== '')) {
+          continue
         }
         
+        // Get the variant for this row (cycle through variants)
+        const variant = variants[rowIndex % variants.length]
+        
+        // Update product name
+        if (productNameCol >= 0) {
+          row[productNameCol] = variant['Product Title'] || ''
+        }
+        
+        // Update description
         if (descriptionCol >= 0) {
-          newData[rowIndex][descriptionCol] = selectedProduct['Description'] || newData[rowIndex][descriptionCol] || ''
+          row[descriptionCol] = variant['Description'] || ''
         }
         
         // Swap data between columns AH (Retail Price) and AI (List Price)
-        const tempAH = newData[rowIndex][retailPriceCol]
-        const tempAI = newData[rowIndex][listPriceCol]
-        newData[rowIndex][retailPriceCol] = tempAI
-        newData[rowIndex][listPriceCol] = tempAH
+        const tempAH = row[retailPriceCol]
+        const tempAI = row[listPriceCol]
+        row[retailPriceCol] = tempAI
+        row[listPriceCol] = tempAH
         
         // Set column BB (index 53) to "No" as default
-        newData[rowIndex][53] = 'No'
+        row[53] = 'No'
         
         // Move Product Status from BC (index 54) to BE (index 56), clear BC and BD
-        const statusData = newData[rowIndex][productStatusCol]
+        const statusData = row[productStatusCol]
         if (statusData !== undefined && statusData !== null && statusData !== '') {
-          newData[rowIndex][56] = statusData  // Move to BE (column 57, index 56)
-          newData[rowIndex][54] = ''  // Clear BC (column 55, index 54)
-          newData[rowIndex][55] = ''  // Clear BD (column 56, index 55)
+          row[56] = statusData  // Move to BE (column 57, index 56)
+          row[54] = ''  // Clear BC (column 55, index 54)
+          row[55] = ''  // Clear BD (column 56, index 55)
         }
         
-        // Update images - fill available image columns with product images
+        // Clear all image columns first, then update with variant images
+        imageColumns.forEach(colIndex => {
+          row[colIndex] = ''
+        })
+        
+        // Now fill with variant's images
         imageColumns.forEach((colIndex, imageIndex) => {
           const imageKey = `Image ${imageIndex + 1}`
-          if (selectedProduct[imageKey]) {
-            newData[rowIndex][colIndex] = selectedProduct[imageKey]
+          if (variant[imageKey]) {
+            row[colIndex] = variant[imageKey]
           }
-          // If no BigCommerce image, keep existing template image
         })
       }
+      
+      // Add this product's 272 rows to final data
+      finalData.push(...productRows)
     }
     
-    console.log(`Updated ${templateData.length - 1} rows with product data`)
+    console.log(`Created Excel with ${finalData.length} total rows (1 header + ${finalData.length - 1} data rows)`)
     
-    // Create new worksheet from updated data
-    const worksheet = XLSX.utils.aoa_to_sheet(newData)
+    // Create new worksheet from final data
+    const worksheet = XLSX.utils.aoa_to_sheet(finalData)
     
     // Create new workbook and add worksheet
     const workbook = XLSX.utils.book_new()
