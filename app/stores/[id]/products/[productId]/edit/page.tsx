@@ -75,10 +75,15 @@ export default function ProductEditPage() {
 
     setSaving(true)
     try {
+      const requestBody = {
+        ...product,
+        syncToBigCommerce: true
+      }
+      
       const res = await fetch(`/api/products/${productId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(product),
+        body: JSON.stringify(requestBody),
       })
 
       if (res.ok) {
@@ -88,6 +93,7 @@ export default function ProductEditPage() {
         })
         router.push(`/products`)
       } else {
+        const errorText = await res.text()
         toast({
           title: "Error",
           description: "Failed to update product",

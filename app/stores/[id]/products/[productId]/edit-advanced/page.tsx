@@ -168,7 +168,8 @@ export default function AdvancedProductEditPage() {
           price: product.price,
           compareAtPrice: product.compareAtPrice,
           tags: product.tags,
-          categories: product.categories
+          categories: product.categories,
+          syncToBigCommerce: true
         }),
       })
 

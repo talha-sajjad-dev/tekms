@@ -294,7 +294,8 @@ export default function ProductsPage() {
         body: JSON.stringify({
           name: editedName,
           price: parseFloat(editedPrice),
-          tags: editedTags.split(',').map(t => t.trim()).filter(Boolean)
+          tags: editedTags.split(',').map(t => t.trim()).filter(Boolean),
+          syncToBigCommerce: true
         })
       })
 

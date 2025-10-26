@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { BiDirectionalSyncService } from '@/lib/sync/bidirectional-sync'
 
 // GET single product
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
+    const { id } = await params
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,7 +18,7 @@ export async function GET(
 
     const product = await db.product.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       },
       include: {
@@ -54,10 +56,11 @@ export async function GET(
 // PATCH update product
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
+    const { id } = await params
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -69,7 +72,7 @@ export async function PATCH(
     // Verify ownership
     const existing = await db.product.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     })
@@ -79,7 +82,7 @@ export async function PATCH(
     }
 
     const updated = await db.product.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name,
         description,
@@ -88,6 +91,20 @@ export async function PATCH(
         compareAtPrice
       }
     })
+
+    const fs = require('fs')
+    const logFile = '/tmp/tekms-sync.log'
+    const log = (msg: string) => {
+      fs.appendFileSync(logFile, `${new Date().toISOString()} - ${msg}\n`)
+    }
+    
+    if (body.syncToBigCommerce !== false) {
+      try {
+        await BiDirectionalSyncService.syncProductToBigCommerce(id)
+      } catch (error) {
+      }
+    } else {
+    }
 
     // Convert Decimal to number
     const serializedProduct = {
@@ -109,10 +126,11 @@ export async function PATCH(
 // DELETE product
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
+    const { id } = await params
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -121,7 +139,7 @@ export async function DELETE(
     // Verify ownership
     const existing = await db.product.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     })
@@ -131,7 +149,7 @@ export async function DELETE(
     }
 
     await db.product.delete({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     return NextResponse.json({ success: true })
