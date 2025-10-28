@@ -5,6 +5,7 @@
 
 import { db } from '@/lib/db';
 import { Platform } from '@prisma/client';
+import { decrypt } from '@/lib/encryption';
 
 interface BigCommerceCredentials {
   storeHash: string;
@@ -12,6 +13,74 @@ interface BigCommerceCredentials {
 }
 
 export class BiDirectionalSyncService {
+
+  static async syncProductToBigCommerce(productId: string): Promise<void> {
+    const product = await db.product.findUnique({
+      where: { id: productId },
+      include: {
+        storeConnection: {
+          select: {
+            id: true,
+            platform: true,
+            accessToken: true,
+            metadata: true,
+            externalStoreId: true
+          }
+        }
+      }
+    });
+
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    if (!product.storeConnection) {
+      throw new Error('Store connection not found');
+    }
+
+    const { storeConnection } = product;
+
+    if (storeConnection.platform !== 'BIGCOMMERCE') {
+      throw new Error('Only BigCommerce sync is supported');
+    }
+
+    if (!product.externalId) {
+      throw new Error('Product external ID not found');
+    }
+
+    const storeHash = storeConnection.externalStoreId;
+    if (!storeHash) {
+      throw new Error('Store hash not found');
+    }
+
+    const apiUrl = `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${product.externalId}`;
+
+    const productData = {
+      name: product.name,
+      description: product.description,
+      sku: product.sku || '',
+      price: Number(product.price),
+      retail_price: product.compareAtPrice ? Number(product.compareAtPrice) : undefined,
+    };
+
+    const decryptedToken = decrypt(storeConnection.accessToken);
+
+    const response = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'X-Auth-Token': decryptedToken,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify(productData)
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to sync product: ${error}`);
+    }
+  }
+
   /**
    * Sync variant updates to BigCommerce
    */

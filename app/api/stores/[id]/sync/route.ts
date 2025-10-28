@@ -12,10 +12,11 @@ import { classifyError, getUserMessage, formatErrorForLog } from '@/lib/sync-err
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
+    const { id } = await params
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -28,7 +29,7 @@ export async function POST(
     
     const store = await db.storeConnection.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     })
