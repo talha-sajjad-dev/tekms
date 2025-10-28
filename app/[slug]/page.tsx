@@ -3,16 +3,8 @@ import { db } from '@/lib/db'
 import { Card, CardContent } from '@/components/ui/card'
 import { HomepageNav } from '@/components/homepage-nav'
 
-export async function generateStaticParams() {
-  const pages = await db.page.findMany({
-    where: { isPublished: true },
-    select: { slug: true }
-  })
-  
-  return pages.map((page) => ({
-    slug: page.slug
-  }))
-}
+// Force dynamic rendering to avoid database access during build
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
