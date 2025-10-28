@@ -299,10 +299,34 @@ export default function ProductsPage() {
       })
 
       if (res.ok) {
-        toast({ title: 'Saved', description: 'Product updated successfully' })
+        const data = await res.json()
+        
+        // Check if BigCommerce sync was attempted
+        if (data.syncResult) {
+          if (data.syncResult.success) {
+            toast({ 
+              title: 'Saved', 
+              description: 'Product updated and synced to BigCommerce successfully' 
+            })
+          } else {
+            toast({ 
+              title: 'Warning', 
+              description: `Product updated locally, but BigCommerce sync failed: ${data.syncResult.error}`,
+              variant: 'destructive'
+            })
+          }
+        } else {
+          toast({ title: 'Saved', description: 'Product updated successfully' })
+        }
+        
         fetchProducts()
       } else {
-        toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive' })
+        const errorData = await res.json().catch(() => ({}))
+        toast({ 
+          title: 'Error', 
+          description: errorData.error || 'Failed to save changes', 
+          variant: 'destructive' 
+        })
       }
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive' })
@@ -441,6 +465,16 @@ export default function ProductsPage() {
     if (stores.length > 0) {
       stores.forEach(store => checkSyncStatus(store.id))
     }
+  }, [stores.length])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (stores.length > 0) {
+        stores.forEach(store => checkSyncStatus(store.id))
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [stores.length])
   
   const handleProgressDialogClose = (open: boolean) => {

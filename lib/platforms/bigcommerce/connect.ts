@@ -13,8 +13,9 @@ export async function connectBigCommerceStore(
   accessToken: string
 ): Promise<{ success: boolean; storeName: string; storeId: string }> {
   
-  // Verify the credentials by fetching store info
-  const response = await fetch(
+  let storeInfo: any = { name: `BigCommerce Store (${storeHash})`, domain: `store-${storeHash}.mybigcommerce.com` }
+  
+  const v2Response = await fetch(
     `https://api.bigcommerce.com/stores/${storeHash}/v2/store`,
     {
       headers: {
@@ -25,12 +26,24 @@ export async function connectBigCommerceStore(
     }
   )
   
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Invalid BigCommerce credentials: ${error}`)
+  if (v2Response.ok) {
+    storeInfo = await v2Response.json()
+  } else {
+    const v3Response = await fetch(
+      `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=1`,
+      {
+        headers: {
+          'X-Auth-Token': accessToken,
+          'Accept': 'application/json',
+        }
+      }
+    )
+    
+    if (!v3Response.ok) {
+      const error = await v3Response.text()
+      throw new Error(`Invalid BigCommerce credentials: ${error}`)
+    }
   }
-  
-  const storeInfo = await response.json()
   
   // Encrypt access token
   const encryptedToken = encrypt(accessToken)
@@ -124,6 +137,25 @@ export async function testBigCommerceCredentials(
 ): Promise<{ valid: boolean; storeName?: string; error?: string }> {
   try {
     const response = await fetch(
+      `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?limit=1`,
+      {
+        headers: {
+          'X-Auth-Token': accessToken,
+          'Accept': 'application/json',
+        }
+      }
+    )
+    
+    if (response.ok) {
+      const data = await response.json()
+      return { 
+        valid: true, 
+        storeName: `BigCommerce Store (${storeHash})`
+      }
+    }
+    
+    // If v3 fails, try v2 store endpoint
+    const v2Response = await fetch(
       `https://api.bigcommerce.com/stores/${storeHash}/v2/store`,
       {
         headers: {
@@ -133,15 +165,15 @@ export async function testBigCommerceCredentials(
       }
     )
     
-    if (!response.ok) {
-      return { valid: false, error: 'Invalid credentials' }
+    if (v2Response.ok) {
+      const storeInfo = await v2Response.json()
+      return { 
+        valid: true, 
+        storeName: storeInfo.name || storeInfo.domain 
+      }
     }
     
-    const storeInfo = await response.json()
-    return { 
-      valid: true, 
-      storeName: storeInfo.name || storeInfo.domain 
-    }
+    return { valid: false, error: 'Invalid credentials - neither v2 nor v3 API accessible' }
     
   } catch (error) {
     return { 
