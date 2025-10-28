@@ -149,20 +149,16 @@ export async function PATCH(
           error: bcError instanceof Error ? bcError.message : 'Unknown error'
         }
       }
-
-    const fs = require('fs')
-    const logFile = '/tmp/tekms-sync.log'
-    const log = (msg: string) => {
-      fs.appendFileSync(logFile, `${new Date().toISOString()} - ${msg}\n`)
     }
+
+    // Remove the fs logging code as it's not needed in production
     
     if (body.syncToBigCommerce !== false) {
       try {
-        await BiDirectionalSyncService.syncProductToBigCommerce(id)
+        await BiDirectionalSyncService.syncProductToBigCommerce(id);
       } catch (error) {
+        console.error('Sync to BigCommerce failed:', error);
       }
-    } else {
-
     }
 
     // Convert Decimal to number
@@ -175,7 +171,7 @@ export async function PATCH(
     return NextResponse.json({ 
       product: serializedProduct,
       syncResult: bcSyncResult
-    })
+    });
   } catch (error) {
     console.error('Error updating product:', error)
     return NextResponse.json(
