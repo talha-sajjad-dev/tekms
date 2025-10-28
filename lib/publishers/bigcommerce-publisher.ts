@@ -290,7 +290,7 @@ export async function publishToBigCommerce(
         entityType: 'channel_listing',
         entityId: channelListing.id,
         field: 'publish',
-        oldValue: null,
+        oldValue: undefined,
         newValue: {
           externalId: externalId,
           platform: 'BIGCOMMERCE',
@@ -375,16 +375,21 @@ function transformToBigCommerceFormat(masterProduct: any, categoryIds: number[] 
     bcProduct.variants = masterProduct.variants.map((variant: any, index: number) => {
       const optionValues = variant.optionValues as Record<string, string>
       
-      return {
+      const variantData: any = {
         sku: variant.sku,
         price: variant.price ? Number(variant.price) : Number(masterProduct.basePrice),
         weight: masterProduct.template?.weight ? Number(masterProduct.template.weight) : 1,
-        inventory_level: 100,
-        option_values: Object.entries(optionValues).map(([key, value]) => ({
+        inventory_level: 100
+      }
+
+      if (optionValues && typeof optionValues === 'object' && Object.keys(optionValues).length > 0) {
+        variantData.option_values = Object.entries(optionValues).map(([key, value]) => ({
           option_display_name: key,
           label: value as string
         }))
       }
+      
+      return variantData
     })
   }
   

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { decrypt } from '@/lib/encryption'
 import { BiDirectionalSyncService } from '@/lib/sync/bidirectional-sync'
 
 // GET single product
@@ -69,11 +70,13 @@ export async function PATCH(
     const body = await req.json()
     const { name, description, sku, price, compareAtPrice } = body
 
-    // Verify ownership
     const existing = await db.product.findFirst({
       where: {
         id: id,
         userId: session.user.id
+      },
+      include: {
+        storeConnection: true
       }
     })
 
@@ -92,6 +95,61 @@ export async function PATCH(
       }
     })
 
+    let bcSyncResult = null
+    if (existing.platform === 'BIGCOMMERCE' && existing.storeConnection) {
+      try {
+        
+        const accessToken = decrypt(existing.storeConnection.accessToken)
+        const storeHash = existing.storeConnection.externalStoreId
+        
+        const bcUpdatePayload: any = {
+          name: name || existing.name,
+          description: description || existing.description,
+          price: price || existing.price
+        }
+
+        if (sku && sku.trim() !== '') {
+          bcUpdatePayload.sku = sku
+        }
+
+        if (compareAtPrice && compareAtPrice > 0) {
+          bcUpdatePayload.retail_price = compareAtPrice
+        }
+
+        const bcResponse = await fetch(
+          `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${existing.externalId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'X-Auth-Token': accessToken,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(bcUpdatePayload)
+          }
+        )
+
+        if (!bcResponse.ok) {
+          const errorData = await bcResponse.json().catch(() => ({}))
+          bcSyncResult = {
+            success: false,
+            error: `BigCommerce API error: ${bcResponse.status}`,
+            details: errorData
+          }
+        } else {
+          const bcResult = await bcResponse.json()
+          bcSyncResult = {
+            success: true,
+            details: bcResult.data
+          }
+        }
+      } catch (bcError) {
+        bcSyncResult = {
+          success: false,
+          error: bcError instanceof Error ? bcError.message : 'Unknown error'
+        }
+      }
+
     const fs = require('fs')
     const logFile = '/tmp/tekms-sync.log'
     const log = (msg: string) => {
@@ -104,6 +162,7 @@ export async function PATCH(
       } catch (error) {
       }
     } else {
+
     }
 
     // Convert Decimal to number
@@ -113,7 +172,10 @@ export async function PATCH(
       compareAtPrice: updated.compareAtPrice ? Number(updated.compareAtPrice) : null
     }
 
-    return NextResponse.json({ product: serializedProduct })
+    return NextResponse.json({ 
+      product: serializedProduct,
+      syncResult: bcSyncResult
+    })
   } catch (error) {
     console.error('Error updating product:', error)
     return NextResponse.json(

@@ -210,10 +210,22 @@ export async function POST(req: NextRequest) {
       // Create variants if provided
       if (variants && Array.isArray(variants) && variants.length > 0) {
         for (const variant of variants) {
+          const hasValidOptionValues = variant.optionValues && 
+            typeof variant.optionValues === 'object' && 
+            Object.keys(variant.optionValues).length > 0
+          
+          const existingVariant = await tx.masterVariant.findUnique({
+            where: { sku: variant.sku }
+          })
+          
+          if (existingVariant) {
+            throw new Error(`SKU "${variant.sku}" already exists. Please use a unique SKU.`)
+          }
+          
           await tx.masterVariant.create({
             data: {
               masterProductId: product.id,
-              optionValues: variant.optionValues,
+              optionValues: hasValidOptionValues ? variant.optionValues : null,
               sku: variant.sku,
               price: variant.price || null,
               compareAtPrice: variant.compareAtPrice || null,
