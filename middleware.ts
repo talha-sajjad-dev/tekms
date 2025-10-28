@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { auth } from "@/lib/auth"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
-  // Maintenance mode is handled via a different approach due to Edge runtime limitations
-  // The check is done in each page component that needs it
   
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -29,55 +25,13 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route))
   const isNextInternal = pathname.startsWith("/_next") || pathname.startsWith("/api/auth/")
 
-  // Allow public routes and Next.js internal routes WITHOUT checking session
-  // This is critical because auth() uses Prisma which doesn't work in edge middleware
+  // Allow public routes and Next.js internal routes
   if (isPublicRoute || isNextInternal) {
     return NextResponse.next()
   }
 
-  // Only call auth() for protected routes
-  const session = await auth()
-
-  // Require authentication for all other routes
-  if (!session?.user) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/"
-    return NextResponse.redirect(url)
-  }
-
-  // Admin-only routes
-  if (pathname.startsWith("/admin")) {
-    if (session.user.role !== "ADMIN") {
-      const url = request.nextUrl.clone()
-      url.pathname = "/dashboard"
-      return NextResponse.redirect(url)
-    }
-  }
-
-  // Legacy/development pages - redirect to dashboard
-  const legacyPages = [
-    "/bc-admin",
-    "/test",
-    "/test-apply",
-    "/test-auth",
-    "/test-install",
-    "/simple-test",
-    "/debug-modifiers",
-    "/investigate-product",
-    "/apply-correct-pricing",
-    "/catalog-pricing-fix",
-    "/clear-pricing",
-    "/modifiers",
-    "/analyze-working-modifiers",
-  ]
-
-  if (legacyPages.some(page => pathname.startsWith(page))) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/dashboard"
-    url.searchParams.set("legacy_redirect", "true")
-    return NextResponse.redirect(url)
-  }
-
+  // For protected routes, we'll let the page components handle authentication
+  // This avoids importing heavy dependencies in middleware
   return NextResponse.next()
 }
 
